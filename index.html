@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Bootlegger — 1920</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥃</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game-wrap">
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="topbar">
+      <span class="stat" id="st-cash">$25</span>
+      <span class="stat" id="st-day">Day 1 · 7:30 AM</span>
+      <span class="stat" id="st-heat" title="Police attention">HEAT 0</span>
+      <span class="stat" id="st-rep" title="Standing with the outfit">REP 0</span>
+      <span class="stat" id="st-comm" title="Standing with the neighborhood">COMMUNITY 0</span>
+      <span class="stat" id="st-hp">HP 100</span>
+    </div>
+    <div id="objective"></div>
+    <div id="suspicion-wrap" class="hidden"><div id="suspicion-bar"></div><span>SUSPICION</span></div>
+    <div id="minimap-wrap"><canvas id="minimap" width="180" height="144"></canvas></div>
+    <div id="toasts"></div>
+    <div id="hint"></div>
+  </div>
+
+  <!-- Dialogue -->
+  <div id="dialogue" class="panel hidden">
+    <div id="dlg-name"></div>
+    <div id="dlg-text"></div>
+    <ol id="dlg-options"></ol>
+  </div>
+
+  <!-- Generic panel (speakeasy, journal, map, help, menu) -->
+  <div id="bigpanel" class="panel hidden">
+    <div id="bp-title"></div>
+    <div id="bp-body"></div>
+    <div id="bp-foot">Esc to close</div>
+  </div>
+
+  <!-- Full-screen overlays -->
+  <div id="title-screen">
+    <h1>THE BOOTLEGGER</h1>
+    <h2>Harbor City · 1920</h2>
+    <p class="blurb">The Volstead Act is four months old and the thirstiest city on the
+    eastern seaboard has never been drier — on paper. You are the newest man on
+    Salvatore Moretti's payroll. Keep the trucks rolling, keep the Tiger pouring,
+    and keep your name out of the Herald-Tribune.</p>
+    <div id="title-buttons">
+      <button id="btn-new">NEW GAME</button>
+      <button id="btn-continue" class="hidden">CONTINUE</button>
+    </div>
+    <p class="fine">A work of historical fiction. WASD to move · E to interact · H for help</p>
+  </div>
+
+  <div id="flash-overlay" class="hidden"><div id="flash-text"></div><p class="fine">Press Enter</p></div>
+</div>
+<script src="js/core.js"></script>
+<script src="js/tuning.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/dialogue.js"></script>
+<script src="js/speakeasy.js"></script>
+<script src="js/npcs.js"></script>
+<script src="js/missions.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/save.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
