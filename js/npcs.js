@@ -892,8 +892,8 @@
         if (B.missionActive('canadian') && !s.flags.m5delivered) {
           if (!B.isNight() && !B.isDusk()) return B.toast('The warehouse is shuttered. The Montreal men only work after dark.');
           if (!B.truckNear(54, 5, 4)) return B.toast('A voice through the boards: "No truck, no rye. Come back heavy."');
-          if (s.truck.crates >= 8) return B.toast('The rye is already loaded. Get it to the Tiger.');
-          s.truck.crates = 8;
+          if (s.truck.crates >= B.TUNE.economy.ryeShipment) return B.toast('The rye is already loaded. Get it to the Tiger.');
+          s.truck.crates = B.TUNE.economy.ryeShipment;
           s.flags.m5loaded = true;
           B.emit('loadCargo');
           return B.toast('Eight cases of Montreal rye. The highway checkpoint is lit up to the south. Choose your road.');

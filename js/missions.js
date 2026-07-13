@@ -146,7 +146,8 @@
   B.on('deliverTiger', load => {
     const s = st();
     if (B.missionActive('firstrun')) s.flags.m2delivered = true;
-    if (B.missionActive('canadian') && s.flags.m5loaded && load >= 6) s.flags.m5delivered = true;
+    // the full order or nothing — the border warehouse refills for free while the job is open
+    if (B.missionActive('canadian') && s.flags.m5loaded && load >= B.TUNE.economy.ryeShipment) s.flags.m5delivered = true;
   });
 
   B.on('nightSettled', ln => {

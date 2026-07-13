@@ -28,11 +28,13 @@
     try { blob = JSON.parse(localStorage.getItem(KEY)); } catch (e) { return false; }
     if (!blob || !blob.state) return false;
 
-    // merge onto a fresh state so new fields keep their defaults
-    B.state = Object.assign(B.newState(), blob.state);
-    B.state.flags = blob.state.flags || {};
-    B.state.speakeasy = Object.assign(B.newState().speakeasy, blob.state.speakeasy);
-    B.state.truck = Object.assign(B.newState().truck, blob.state.truck);
+    // merge onto fresh defaults, one level deep, so saves from older versions
+    // keep any top-level OR nested fields added since they were written
+    const defaults = B.newState();
+    B.state = Object.assign({}, defaults, blob.state);
+    for (const k of ['flags', 'perks', 'allies', 'clocks', 'side', 'stats', 'speakeasy', 'truck']) {
+      B.state[k] = Object.assign({}, defaults[k], blob.state[k]);
+    }
 
     B.player.x = blob.player.x; B.player.y = blob.player.y;
     B.player.inTruck = !!blob.player.inTruck;

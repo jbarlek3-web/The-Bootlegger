@@ -43,6 +43,7 @@ B.TUNE = {
     crateFarm: 6,            // Hollis's corn, 4/day
     crateBorder: 7,          // Montreal rye, after dark, post-pipeline
     champagne: 20,
+    ryeShipment: 8,        // the Canadian Connection order — load and delivery must match
     fenceBuysAt: 9,          // what Frankie pays for a hot crate
     truckCapacity: 8,
   },
