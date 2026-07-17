@@ -176,11 +176,20 @@
   };
 
   /* ================= rendering ================= */
-  const TILE_COLORS = {
-    [T.GRASS]: '#3d5233', [T.ROAD]: '#3b3833', [T.WALK]: '#8c8272',
-    [T.BUILDING]: '#5a4632', [T.WATER]: '#27435c', [T.DIRT]: '#6a5638',
-    [T.PIER]: '#7d6644', [T.FARM]: '#75603a', [T.PARK]: '#46603a',
-  };
+  const isLand = t => t !== T.WATER;
+
+  /* door facing: which neighbor tile is the building wall */
+  function doorDir(d) {
+    if (d._dir) return d._dir;
+    if (B.tileAt(d.x, d.y - 1) === T.BUILDING) d._dir = 0;            // building north
+    else if (B.tileAt(d.x + 1, d.y) === T.BUILDING) d._dir = 1;       // east
+    else if (B.tileAt(d.x, d.y + 1) === T.BUILDING) d._dir = 2;       // south
+    else if (B.tileAt(d.x - 1, d.y) === T.BUILDING) d._dir = 3;       // west
+    else d._dir = 0;
+    return d._dir;
+  }
+
+  const AWNING = [['#7a2222', '#d8c9a4'], ['#2f4a3c', '#d8c9a4'], ['#3a3f5c', '#cbb98e']];
 
   B.renderWorld = function (ctx, cam) {
     const ts = B.TILE;
@@ -190,26 +199,42 @@
     for (let j = y0; j < y1; j++) {
       for (let i = x0; i < x1; i++) {
         const t = tile(i, j);
-        ctx.fillStyle = TILE_COLORS[t];
-        const px = (i - cam.x) * ts, py = (j - cam.y) * ts;
-        ctx.fillRect(px, py, ts + 1, ts + 1);
-        if (t === T.ROAD && (i + j) % 4 === 0) {           // faint cobble seams
-          ctx.fillStyle = 'rgba(0,0,0,0.08)';
-          ctx.fillRect(px, py, ts, 2);
-        }
-        if (t === T.WATER && (i * 7 + j * 13 + (B.frame >> 5)) % 11 === 0) {
-          ctx.fillStyle = 'rgba(255,255,255,0.07)';
-          ctx.fillRect(px + 6, py + 14, 14, 2);
-        }
-        if (t === T.FARM && j % 2 === 0) {
-          ctx.fillStyle = 'rgba(0,0,0,0.1)';
-          ctx.fillRect(px, py + 12, ts, 3);
+        const px = Math.round((i - cam.x) * ts), py = Math.round((j - cam.y) * ts);
+        ctx.drawImage(B.TEX[t][B.texVariant(i, j)], px, py);
+
+        if (t === T.WATER) {
+          // shoreline against land + drifting glints
+          ctx.fillStyle = 'rgba(190,215,220,0.22)';
+          if (isLand(B.tileAt(i - 1, j))) ctx.fillRect(px, py, 3, ts);
+          if (isLand(B.tileAt(i + 1, j))) ctx.fillRect(px + ts - 3, py, 3, ts);
+          if (isLand(B.tileAt(i, j - 1))) ctx.fillRect(px, py, ts, 3);
+          if (isLand(B.tileAt(i, j + 1))) ctx.fillRect(px, py + ts - 3, ts, 3);
+          if ((i * 7 + j * 13 + (B.frame >> 5)) % 11 === 0) {
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx.fillRect(px + 6, py + 14, 14, 2);
+          }
+        } else if (t === T.WALK) {
+          // granite curb where the sidewalk meets the roadway
+          if (B.tileAt(i, j + 1) === T.ROAD) {
+            ctx.fillStyle = 'rgba(220,210,185,0.28)'; ctx.fillRect(px, py + ts - 3, ts, 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(px, py + ts - 1, ts, 1);
+          }
+          if (B.tileAt(i, j - 1) === T.ROAD) {
+            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(px, py, ts, 2);
+          }
+          if (B.tileAt(i + 1, j) === T.ROAD) {
+            ctx.fillStyle = 'rgba(220,210,185,0.28)'; ctx.fillRect(px + ts - 3, py, 2, ts);
+            ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(px + ts - 1, py, 1, ts);
+          }
+          if (B.tileAt(i - 1, j) === T.ROAD) {
+            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(px, py, 2, ts);
+          }
         }
       }
     }
 
     /* road center dashes */
-    ctx.fillStyle = 'rgba(220,210,180,0.14)';
+    ctx.fillStyle = 'rgba(220,210,180,0.13)';
     for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) {
       if (tile(i, j) !== T.ROAD) continue;
       const vC = i > 0 && tile(i - 1, j) === T.ROAD && i < W - 1 && tile(i + 1, j) === T.ROAD;
@@ -217,43 +242,85 @@
       if (vC && hC && j % 2 === 0 && i % 2 === 0) ctx.fillRect((i - cam.x) * ts + 14, (j - cam.y) * ts + 14, 4, 4);
     }
 
-    /* buildings */
+    /* buildings — drop shadow first, then baked roof */
     const px = B.player ? B.player.x : 0, py = B.player ? B.player.y : 0;
+    const dark = B.darkness();
+    ctx.fillStyle = 'rgba(10,8,5,0.32)';
     for (const b of B.buildings) {
       if (b.x + b.w < cam.x - 1 || b.x > cam.x + B.VIEW_W / ts + 1) continue;
       if (b.y + b.h < cam.y - 1 || b.y > cam.y + B.VIEW_H / ts + 1) continue;
-      const bx = (b.x - cam.x) * ts, by = (b.y - cam.y) * ts;
-      ctx.fillStyle = b.color;
-      ctx.fillRect(bx, by, b.w * ts, b.h * ts);
-      // roof shading + parapet
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fillRect(bx, by, b.w * ts, 6);
-      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bx + 1, by + 1, b.w * ts - 2, b.h * ts - 2);
-      // skylight grid on big roofs
-      if (b.w >= 6) {
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
-        for (let k = 1; k < b.w - 1; k += 2) ctx.fillRect(bx + k * ts + 8, by + ts, 12, 12);
+      ctx.fillRect((b.x - cam.x) * ts + 6, (b.y - cam.y) * ts + 8, b.w * ts, b.h * ts);
+    }
+    let bi = 0;
+    for (const b of B.buildings) {
+      bi++;
+      if (b.x + b.w < cam.x - 1 || b.x > cam.x + B.VIEW_W / ts + 1) continue;
+      if (b.y + b.h < cam.y - 1 || b.y > cam.y + B.VIEW_H / ts + 1) continue;
+      if (!b._tex) B.bakeBuilding(b, bi);
+      const bx = Math.round((b.x - cam.x) * ts), by = Math.round((b.y - cam.y) * ts);
+      ctx.drawImage(b._tex, bx, by);
+      // lit skylights after dark
+      if (dark > 0.25 && b._panes) {
+        ctx.fillStyle = 'rgba(255,196,110,' + (0.5 * dark) + ')';
+        for (const p of b._panes) if (p.lit) ctx.fillRect(bx + p.x - 7, by + p.y - 6, 14, 12);
       }
-      // label when the player is close
+      // label plaque when named or close
       const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
       if (b.named || B.dist(px, py, cx, cy) < 9) {
         ctx.font = (b.named ? 'bold 13px' : '11px') + ' Georgia';
         ctx.textAlign = 'center';
-        ctx.fillStyle = b.named ? '#e8d9a0' : 'rgba(232,220,192,0.75)';
-        ctx.fillText(b.name, bx + b.w * ts / 2, by + b.h * ts / 2 + 4);
+        const tw = ctx.measureText(b.name).width;
+        const lx = bx + b.w * ts / 2, ly = by + b.h * ts / 2;
+        ctx.fillStyle = 'rgba(16,12,8,' + (b.named ? 0.72 : 0.5) + ')';
+        ctx.fillRect(lx - tw / 2 - 7, ly - 9, tw + 14, 19);
+        if (b.named) {
+          ctx.strokeStyle = 'rgba(201,162,39,0.65)'; ctx.lineWidth = 1;
+          ctx.strokeRect(lx - tw / 2 - 7.5, ly - 9.5, tw + 15, 20);
+        }
+        ctx.fillStyle = b.named ? '#e8d9a0' : 'rgba(232,220,192,0.8)';
+        ctx.fillText(b.name, lx, ly + 5);
       }
     }
 
-    /* doors */
+    /* doors: recessed entry + striped awning on the facade side */
+    let di = 0;
     for (const d of B.doors) {
+      di++;
       const dx = (d.x - cam.x) * ts, dy = (d.y - cam.y) * ts;
-      if (dx < -ts || dy < -ts || dx > B.VIEW_W || dy > B.VIEW_H) continue;
-      ctx.fillStyle = '#241a10';
-      ctx.fillRect(dx + 8, dy + 6, ts - 16, ts - 12);
+      if (dx < -ts * 2 || dy < -ts * 2 || dx > B.VIEW_W + ts || dy > B.VIEW_H + ts) continue;
+      const dir = doorDir(d);
+      ctx.save();
+      ctx.translate(dx + ts / 2, dy + ts / 2);
+      ctx.rotate(dir * Math.PI / 2);
+      // stone step
+      ctx.fillStyle = 'rgba(210,200,175,0.30)';
+      ctx.fillRect(-9, -ts / 2 + 9, 18, 4);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(-9, -ts / 2 + 12, 18, 1.5);
+      // paneled wood door set into the wall
+      ctx.fillStyle = '#221709';
+      ctx.fillRect(-8, -ts / 2 - 6, 16, 15);
+      ctx.fillStyle = '#392812';
+      ctx.fillRect(-6.5, -ts / 2 - 4.5, 13, 12);
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
+      ctx.strokeRect(-4.5, -ts / 2 - 2.5, 4, 8); ctx.strokeRect(0.5, -ts / 2 - 2.5, 4, 8);
       ctx.fillStyle = '#c9a227';
-      ctx.fillRect(dx + ts - 13, dy + ts / 2 - 1, 3, 3);
+      ctx.fillRect(4, -ts / 2 + 1, 2, 2);
+      // striped awning over the entry
+      const [ca, cb] = AWNING[di % AWNING.length];
+      for (let k = 0; k < 5; k++) {
+        ctx.fillStyle = k % 2 ? cb : ca;
+        ctx.fillRect(-11 + k * 4.4, -ts / 2 + 4, 4.4, 7);
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillRect(-11, -ts / 2 + 10, 22, 2.2);           // scalloped shadow line
+      ctx.restore();
+      // lantern beside the named doors after dark (feeds the bloom pass)
+      if (dark > 0.25) {
+        const a = [[12, -4], [4, 12], [-12, 4], [-4, -12]][dir];
+        ctx.fillStyle = 'rgba(255,210,120,' + (0.85 * dark) + ')';
+        ctx.beginPath(); ctx.arc(dx + ts / 2 + a[0], dy + ts / 2 + a[1], 2.4, 0, 7); ctx.fill();
+      }
     }
 
     /* decor */
@@ -261,25 +328,24 @@
       const dx = (d.x - cam.x) * ts, dy = (d.y - cam.y) * ts;
       if (dx < -ts * 2 || dy < -ts * 2 || dx > B.VIEW_W + ts || dy > B.VIEW_H + ts) continue;
       if (d.type === 'tree') {
+        const v = ((d.x * 13 + d.y * 7) | 0) % 4;
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath(); ctx.ellipse(dx + 19, dy + 20, 13, 6, 0, 0, 7); ctx.fill();
         ctx.fillStyle = '#3a2c1a';
-        ctx.fillRect(dx + 13, dy + 16, 6, 12);
-        ctx.fillStyle = '#2f4a26';
-        ctx.beginPath(); ctx.arc(dx + 16, dy + 12, 13, 0, 7); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.beginPath(); ctx.arc(dx + 12, dy + 8, 6, 0, 7); ctx.fill();
+        ctx.fillRect(dx + 14, dy + 15, 5, 10);
+        ctx.drawImage(B.SPRITES.tree[v], dx - 6, dy - 10);
       } else if (d.type === 'lamp') {
-        ctx.fillStyle = '#222';
-        ctx.fillRect(dx + 14, dy + 6, 4, 22);
-        ctx.fillStyle = B.darkness() > 0.2 ? '#ffd76a' : '#665f3f';
-        ctx.beginPath(); ctx.arc(dx + 16, dy + 5, 4, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(dx + 20, dy + 30, 8, 3, 0, 0, 7); ctx.fill();
+        ctx.drawImage(B.SPRITES.lamp, dx + 8, dy - 2);
+        if (dark > 0.2) {                 // hot glass core for the bloom pass
+          ctx.fillStyle = 'rgba(255,222,140,0.95)';
+          ctx.fillRect(dx + 13.5, dy + 7, 5, 5);
+        }
       } else if (d.type === 'bench') {
-        ctx.fillStyle = '#4a371f';
-        ctx.fillRect(dx, dy + 10, 30, 8);
+        ctx.drawImage(B.SPRITES.bench, dx, dy + 4);
       } else if (d.type === 'crate') {
-        ctx.fillStyle = '#7a5c30';
-        ctx.fillRect(dx + 4, dy + 4, 20, 20);
-        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-        ctx.strokeRect(dx + 4, dy + 4, 20, 20);
+        ctx.drawImage(B.SPRITES.crate, dx + 2, dy + 2);
       }
     }
   };
