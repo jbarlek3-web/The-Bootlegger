@@ -15,6 +15,7 @@
     B.spawnPolice();
     B.spawnPedestrians(16);
     B.initMinimap();
+    B.initGlfx();
 
     document.getElementById('btn-new').addEventListener('click', newGame);
     const cont = document.getElementById('btn-continue');
@@ -185,7 +186,8 @@
     ctx.clearRect(0, 0, B.VIEW_W, B.VIEW_H);
     B.renderWorld(ctx, cam);
     B.renderEntities(ctx, cam);
-    B.renderLight(ctx, cam);
+    if (B.glfx && B.glfx.ok) B.glfx.render(cam);
+    else B.renderLight(ctx, cam);
     B.renderMinimap();
     B.refreshHUD();
     if (B.debugOn) renderDebug(dt);
@@ -227,6 +229,7 @@
     cam.y = 45 + Math.cos(t * 0.7) * 15;
     ctx.clearRect(0, 0, B.VIEW_W, B.VIEW_H);
     B.renderWorld(ctx, cam);
+    if (B.glfx && B.glfx.ok) B.glfx.render(cam);
   }
 
   boot();

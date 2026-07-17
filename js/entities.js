@@ -10,7 +10,7 @@
     const nx = e.x + dx * e.speed * dt, ny = e.y + dy * e.speed * dt;
     if (!B.collides(nx, e.y, e.r)) e.x = nx;
     if (!B.collides(e.x, ny, e.r)) e.y = ny;
-    if (dx || dy) e.facing = Math.atan2(dy, dx);
+    if (dx || dy) { e.facing = Math.atan2(dy, dx); e._anim = (e._anim || 0) + dt * e.speed; }
   }
 
   /* ---------- player ---------- */
@@ -304,48 +304,149 @@
   };
 
   /* ---------- rendering ---------- */
+  function shade(hex, f) {
+    const v = parseInt(hex.slice(1), 16);
+    return 'rgb(' + (B.clamp((v >> 16) * f, 0, 255) | 0) + ',' +
+      (B.clamp(((v >> 8) & 255) * f, 0, 255) | 0) + ',' + (B.clamp((v & 255) * f, 0, 255) | 0) + ')';
+  }
+
   function drawPerson(ctx, x, y, n) {
+    const step = Math.sin((n._anim || 0) * 7);
+    const bob = Math.abs(step) * 1.2;
     // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(x, y + 8, 8, 4, 0, 0, 7); ctx.fill();
-    // coat
-    ctx.fillStyle = n.coat || '#4a3a2a';
-    ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.beginPath(); ctx.ellipse(x, y + 8, 8, 3.6, 0, 0, 7); ctx.fill();
+    // feet peeking out mid-stride
+    ctx.fillStyle = '#171310';
+    ctx.beginPath(); ctx.ellipse(x - 3.5, y + 7 + step * 2, 2.4, 1.6, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + 3.5, y + 7 - step * 2, 2.4, 1.6, 0, 0, 7); ctx.fill();
+    y -= bob;
+    const coat = n.coat || '#4a3a2a';
+    // arms swing at the sides
+    ctx.fillStyle = shade(coat, 0.8);
+    ctx.beginPath(); ctx.arc(x - 8, y + 1 + step * 1.6, 2.8, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 8, y + 1 - step * 1.6, 2.8, 0, 7); ctx.fill();
+    // overcoat with a darker hem and a lit shoulder
+    ctx.fillStyle = shade(coat, 0.72);
+    ctx.beginPath(); ctx.arc(x, y + 1.5, 9, 0, 7); ctx.fill();
+    ctx.fillStyle = coat;
+    ctx.beginPath(); ctx.arc(x, y, 8.6, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,210,0.14)';
+    ctx.beginPath(); ctx.arc(x - 3, y - 3, 5, 0, 7); ctx.fill();
+    // front seam + buttons
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 7); ctx.stroke();
+    if (n.kind === 'cop') {
+      ctx.fillStyle = '#d8c15a';
+      ctx.fillRect(x - 3, y + 1, 2, 2); ctx.fillRect(x + 1.5, y + 1, 2, 2);
+    }
     // head
     ctx.fillStyle = n.color || '#c8b48a';
     ctx.beginPath(); ctx.arc(x, y - 6, 5, 0, 7); ctx.fill();
-    // hat brim (everyone wears a hat in 1920)
-    ctx.fillStyle = n.kind === 'cop' ? '#1d2a4a' : (n.hat || '#33291c');
-    ctx.beginPath(); ctx.ellipse(x, y - 8, 7, 3.4, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(x, y - 10, 4, 0, 7); ctx.fill();
-    if (n.kind === 'cop') {          // badge glint
+    // hat: brim, crown, band (peaked cap for cops)
+    const hat = n.kind === 'cop' ? '#1d2a4a' : (n.hat || '#33291c');
+    ctx.fillStyle = shade(hat, 0.75);
+    ctx.beginPath(); ctx.ellipse(x, y - 7.5, 7.4, 3.6, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = hat;
+    ctx.beginPath(); ctx.arc(x, y - 10, 4.4, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(x, y - 8.2, 4.4, 1.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,210,0.18)';
+    ctx.beginPath(); ctx.arc(x - 1.5, y - 11.2, 1.8, 0, 7); ctx.fill();
+    if (n.kind === 'cop') {          // cap badge
       ctx.fillStyle = '#d8c15a';
-      ctx.fillRect(x - 2, y - 2, 3, 3);
+      ctx.fillRect(x - 1, y - 11.5, 2.4, 2.4);
     }
   }
 
-  function drawCar(ctx, x, y, facing, body, isPolice) {
+  /* period vehicles, canonical facing +x. kind: 'car' | 'truck' | 'police' */
+  function drawCar(ctx, x, y, facing, body, kind, load) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(facing);
+    const dk = shade(body, 0.62), lt = shade(body, 1.28);
+    // ground shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(-22, -10, 46, 22);
-    ctx.fillStyle = body;
-    ctx.fillRect(-22, -12, 44, 24);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(-4, -10, 14, 20);                       // cab roof
-    ctx.fillStyle = '#1a1611';
-    ctx.fillRect(-24, -13, 8, 5); ctx.fillRect(-24, 8, 8, 5);
-    ctx.fillRect(14, -13, 8, 5); ctx.fillRect(14, 8, 8, 5);
-    if (isPolice) {
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 9px Georgia'; ctx.textAlign = 'center';
-      ctx.fillText('POLICE', -2, 3);
+    ctx.beginPath(); ctx.roundRect(-23, -11, 50, 24, 6); ctx.fill();
+    // tires
+    ctx.fillStyle = '#14110d';
+    for (const [wx, wy] of [[-15, -13], [-15, 8], [13, -13], [13, 8]]) {
+      ctx.beginPath(); ctx.roundRect(wx, wy, 10, 5, 2); ctx.fill();
     }
-    if (B.darkness() > 0.2) {
-      ctx.fillStyle = 'rgba(255,230,150,0.8)';
-      ctx.fillRect(20, -10, 4, 5); ctx.fillRect(20, 5, 4, 5);
+    // running boards
+    ctx.fillStyle = dk;
+    ctx.fillRect(-19, -12, 34, 2.5); ctx.fillRect(-19, 9.5, 34, 2.5);
+    if (kind === 'truck') {
+      // stake bed with planks
+      ctx.fillStyle = '#3c2d18';
+      ctx.beginPath(); ctx.roundRect(-24, -10.5, 26, 21, 2); ctx.fill();
+      ctx.fillStyle = '#57422a';
+      ctx.beginPath(); ctx.roundRect(-22.5, -9, 23, 18, 1.5); ctx.fill();
+      ctx.strokeStyle = 'rgba(25,17,8,0.7)'; ctx.lineWidth = 1;
+      for (let k = -18; k < 0; k += 5) { ctx.beginPath(); ctx.moveTo(k, -9); ctx.lineTo(k, 9); ctx.stroke(); }
+      // cargo
+      const crates = Math.min(4, Math.ceil((load || 0) / 2));
+      for (let k = 0; k < crates; k++) {
+        const cx2 = -19 + (k % 2) * 9, cy2 = -7 + ((k / 2) | 0) * 9;
+        ctx.fillStyle = '#7a5c30';
+        ctx.fillRect(cx2, cy2, 8, 8);
+        ctx.strokeStyle = 'rgba(30,20,10,0.7)'; ctx.strokeRect(cx2 + 0.5, cy2 + 0.5, 7, 7);
+        ctx.beginPath(); ctx.moveTo(cx2, cy2); ctx.lineTo(cx2 + 8, cy2 + 8);
+        ctx.moveTo(cx2 + 8, cy2); ctx.lineTo(cx2, cy2 + 8); ctx.stroke();
+      }
+      // cab + hood
+      ctx.fillStyle = body;
+      ctx.beginPath(); ctx.roundRect(2, -9.5, 12, 19, 2); ctx.fill();
+      ctx.fillStyle = lt;
+      ctx.fillRect(3.5, -7.5, 8, 15);
+      ctx.fillStyle = body;
+      ctx.beginPath(); ctx.roundRect(13, -7, 10, 14, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(13.5, -7, 1.5, 14);                     // windshield line
+      ctx.fillStyle = shade(body, 0.8);
+      for (let k = 15; k < 22; k += 2.6) ctx.fillRect(k, -6, 1.2, 12);  // hood louvres
+    } else {
+      // enclosed sedan: body shell, sweeping fenders, cabin roof
+      ctx.fillStyle = body;
+      ctx.beginPath(); ctx.roundRect(-21, -10, 43, 20, 5); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(-21, -10, 43, 20, 5); ctx.stroke();
+      ctx.fillStyle = dk;
+      ctx.beginPath(); ctx.roundRect(-21, -11, 10, 4, 2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-21, 7, 10, 4, 2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(11, -11, 10, 4, 2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(11, 7, 10, 4, 2); ctx.fill();
+      // cabin roof with center crease
+      ctx.fillStyle = lt;
+      ctx.beginPath(); ctx.roundRect(-8, -8, 16, 16, 3); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.stroke();
+      // windshield + rear glass slits
+      ctx.fillStyle = '#1c242c';
+      ctx.fillRect(8, -6.5, 2, 13); ctx.fillRect(-10, -6, 2, 12);
+      // spare tire on the tail
+      ctx.fillStyle = '#14110d';
+      ctx.beginPath(); ctx.arc(-21, 0, 4.5, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2c2620';
+      ctx.beginPath(); ctx.arc(-21, 0, 2, 0, 7); ctx.fill();
+      // hood louvres
+      ctx.fillStyle = shade(body, 0.8);
+      for (let k = 12; k < 20; k += 2.6) ctx.fillRect(k, -5, 1.2, 10);
+      if (kind === 'police') {
+        ctx.fillStyle = '#e8e2d2';
+        ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, 7); ctx.fill();
+        ctx.fillStyle = '#26355c';
+        ctx.font = 'bold 7px Georgia'; ctx.textAlign = 'center';
+        ctx.fillText('PD', 0, 2.5);
+      }
     }
+    // radiator + headlamps (bright at night so the bloom pass catches them)
+    ctx.fillStyle = '#2a2620';
+    ctx.fillRect(22, -6, 2.5, 12);
+    const night = B.darkness() > 0.2;
+    ctx.fillStyle = night ? 'rgba(255,238,170,0.95)' : '#b8ad8c';
+    ctx.beginPath(); ctx.arc(22, -8, 2.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(22, 8, 2.2, 0, 7); ctx.fill();
     ctx.restore();
   }
 
@@ -356,7 +457,7 @@
     // truck (still drawn when stolen — it sits behind O'Banion's garage)
     if (B.truck) {
       const [tx, ty] = toPx(B.truck.x, B.truck.y);
-      drawCar(ctx, tx, ty, B.truck.facing, '#5c4a26', false);
+      drawCar(ctx, tx, ty, B.truck.facing, '#5c4a26', 'truck', B.state.truck.crates + B.state.truck.champagne);
       const load = B.state.truck.crates + B.state.truck.champagne;
       if (load > 0 && !B.player.inTruck) {
         ctx.fillStyle = '#e8d9a0'; ctx.font = '11px Georgia'; ctx.textAlign = 'center';
@@ -369,7 +470,7 @@
     for (const n of list) {
       const [nx, ny] = toPx(n.x, n.y);
       if (nx < -60 || ny < -60 || nx > B.VIEW_W + 60 || ny > B.VIEW_H + 60) continue;
-      if (n.kind === 'patrolcar') { drawCar(ctx, nx, ny, n.facing, '#26355c', true); continue; }
+      if (n.kind === 'patrolcar') { drawCar(ctx, nx, ny, n.facing, '#26355c', 'police'); continue; }
       drawPerson(ctx, nx, ny, n);
       if (n.id && n.name && B.dist(n.x, n.y, B.player.x, B.player.y) < 6 && n.kind !== 'ped') {
         ctx.fillStyle = n.kind === 'thug' && n.hostile ? '#e88' : '#e8d9a0';
