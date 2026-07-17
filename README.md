@@ -1,5 +1,7 @@
 # The Bootlegger
 
+![The Bootlegger — Prohibition is temporary. Power is earned.](assets/logo.jpg)
+
 **Harbor City, 1920.** An open-world crime game set in the first year of Prohibition.
 You are the newest man on Salvatore Moretti's payroll: run the trucks, run the speakeasy,
 and keep your name out of the papers.
