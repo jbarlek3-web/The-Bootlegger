@@ -197,11 +197,10 @@ canvas#game {
   text-align: center;
   z-index: 10;
 }
-#title-screen h1 {
-  font-size: 72px;
-  letter-spacing: 10px;
-  color: var(--gold);
-  text-shadow: 3px 3px 0 #000;
+#title-logo {
+  width: min(620px, 82%);
+  height: auto;
+  filter: drop-shadow(0 8px 28px rgba(0, 0, 0, 0.85));
 }
 #title-screen h2 {
   font-size: 20px;
