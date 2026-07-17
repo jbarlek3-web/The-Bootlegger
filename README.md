@@ -8,7 +8,10 @@ Built entirely in vanilla HTML5/JavaScript — no dependencies, no build step.
 
 ## Play
 
-Open `index.html` in any modern browser, or serve the folder:
+**Play online:** https://jbarlek3-web.github.io/The-Bootlegger/ (deployed automatically
+from `main` via GitHub Pages).
+
+Or run it locally — open `index.html` in any modern browser, or serve the folder:
 
 ```
 python3 -m http.server 8000
