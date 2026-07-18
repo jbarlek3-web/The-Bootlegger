@@ -10,7 +10,11 @@
     const nx = e.x + dx * e.speed * dt, ny = e.y + dy * e.speed * dt;
     if (!B.collides(nx, e.y, e.r)) e.x = nx;
     if (!B.collides(e.x, ny, e.r)) e.y = ny;
-    if (dx || dy) e.facing = Math.atan2(dy, dx);
+    if (dx || dy) {
+      e.facing = Math.atan2(dy, dx);
+      e.walk = (e.walk || 0) + Math.hypot(dx, dy) * e.speed * dt * 0.55;  // walk-cycle phase
+      e._lastMove = B.frame;
+    }
   }
 
   /* ---------- player ---------- */
@@ -18,6 +22,7 @@
     B.player = {
       x: 31.5, y: 69.5, r: 0.32, speed: B.TUNE.player.walkSpeed, facing: 0,
       inTruck: false, punchCd: 0,
+      coat: '#5b4430', hat: '#33281c', color: '#d4b98c', trousers: '#26242c',
     };
   };
 
@@ -304,51 +309,6 @@
   };
 
   /* ---------- rendering ---------- */
-  function drawPerson(ctx, x, y, n) {
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(x, y + 8, 8, 4, 0, 0, 7); ctx.fill();
-    // coat
-    ctx.fillStyle = n.coat || '#4a3a2a';
-    ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
-    // head
-    ctx.fillStyle = n.color || '#c8b48a';
-    ctx.beginPath(); ctx.arc(x, y - 6, 5, 0, 7); ctx.fill();
-    // hat brim (everyone wears a hat in 1920)
-    ctx.fillStyle = n.kind === 'cop' ? '#1d2a4a' : (n.hat || '#33291c');
-    ctx.beginPath(); ctx.ellipse(x, y - 8, 7, 3.4, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(x, y - 10, 4, 0, 7); ctx.fill();
-    if (n.kind === 'cop') {          // badge glint
-      ctx.fillStyle = '#d8c15a';
-      ctx.fillRect(x - 2, y - 2, 3, 3);
-    }
-  }
-
-  function drawCar(ctx, x, y, facing, body, isPolice) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(facing);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(-22, -10, 46, 22);
-    ctx.fillStyle = body;
-    ctx.fillRect(-22, -12, 44, 24);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(-4, -10, 14, 20);                       // cab roof
-    ctx.fillStyle = '#1a1611';
-    ctx.fillRect(-24, -13, 8, 5); ctx.fillRect(-24, 8, 8, 5);
-    ctx.fillRect(14, -13, 8, 5); ctx.fillRect(14, 8, 8, 5);
-    if (isPolice) {
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 9px Georgia'; ctx.textAlign = 'center';
-      ctx.fillText('POLICE', -2, 3);
-    }
-    if (B.darkness() > 0.2) {
-      ctx.fillStyle = 'rgba(255,230,150,0.8)';
-      ctx.fillRect(20, -10, 4, 5); ctx.fillRect(20, 5, 4, 5);
-    }
-    ctx.restore();
-  }
-
   B.renderEntities = function (ctx, cam) {
     const ts = B.TILE;
     const toPx = (x, y) => [(x - cam.x) * ts, (y - cam.y) * ts];
@@ -356,32 +316,34 @@
     // truck (still drawn when stolen — it sits behind O'Banion's garage)
     if (B.truck) {
       const [tx, ty] = toPx(B.truck.x, B.truck.y);
-      drawCar(ctx, tx, ty, B.truck.facing, '#5c4a26', false);
-      const load = B.state.truck.crates + B.state.truck.champagne;
-      if (load > 0 && !B.player.inTruck) {
-        ctx.fillStyle = '#e8d9a0'; ctx.font = '11px Georgia'; ctx.textAlign = 'center';
-        ctx.fillText(load + ' crate' + (load > 1 ? 's' : ''), tx, ty - 20);
+      if (tx > -80 && ty > -80 && tx < B.VIEW_W + 80 && ty < B.VIEW_H + 80) {
+        B.drawTruck(ctx, tx, ty, B.truck.facing);
+        const load = B.state.truck.crates + B.state.truck.champagne;
+        if (load > 0 && !B.player.inTruck) {
+          ctx.fillStyle = '#e8d9a0'; ctx.font = '11px Georgia'; ctx.textAlign = 'center';
+          ctx.fillText(load + ' crate' + (load > 1 ? 's' : ''), tx, ty - 22);
+        }
       }
     }
 
-    // npcs sorted by y for painter's order
+    // people + prowl car, painter's order by y
     const list = B.npcs.filter(n => !n.hidden).sort((a, b) => a.y - b.y);
     for (const n of list) {
       const [nx, ny] = toPx(n.x, n.y);
       if (nx < -60 || ny < -60 || nx > B.VIEW_W + 60 || ny > B.VIEW_H + 60) continue;
-      if (n.kind === 'patrolcar') { drawCar(ctx, nx, ny, n.facing, '#26355c', true); continue; }
-      drawPerson(ctx, nx, ny, n);
+      if (n.kind === 'patrolcar') { B.drawSedan(ctx, nx, ny, n.facing); continue; }
+      B.drawSprite(ctx, n, nx, ny);
       if (n.id && n.name && B.dist(n.x, n.y, B.player.x, B.player.y) < 6 && n.kind !== 'ped') {
         ctx.fillStyle = n.kind === 'thug' && n.hostile ? '#e88' : '#e8d9a0';
         ctx.font = '12px Georgia'; ctx.textAlign = 'center';
-        ctx.fillText(n.name, nx, ny - 18);
+        ctx.fillText(n.name, nx, ny - 32);
       }
     }
 
-    // player
+    // player (on foot)
     if (!B.player.inTruck) {
       const [px, py] = toPx(B.player.x, B.player.y);
-      drawPerson(ctx, px, py, { coat: '#6b2f2a', color: '#d4b98c', hat: '#40342a' });
+      B.drawSprite(ctx, B.player, px, py);
     }
   };
 })();

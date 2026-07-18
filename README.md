@@ -85,13 +85,18 @@ truck from watchful eyes, because neighbors who like you don't rat.
 Every gameplay constant — speeds, prices, demand curves, suspicion rates, clock lengths —
 lives in one exposed object in [`js/tuning.js`](js/tuning.js). Tweak, reload, replay.
 The F2 overlay shows live state-scoped telemetry (FPS, suspicion, clocks, forecasts)
-while you tune.
+while you tune — it also displays the raw, unprocessed frame, since the WebGL2 layer
+(`js/glfx.js`: street-lamp point lights, dual-Kawase bloom, ACES film grade, vignette)
+sits over the 2D scene and falls back to a plain canvas overlay where WebGL2 is missing.
 
 | File | What it owns |
 |---|---|
 | `js/core.js` | Namespace, state, event bus, input |
 | `js/tuning.js` | Every tunable number, in one place |
-| `js/world.js` | Harbor City map, collision, tile rendering |
+| `js/textures.js` | Procedural environment art: cobbles, brick, posters |
+| `js/sprites.js` | Pre-rendered character walk cycles and vehicles |
+| `js/glfx.js` | WebGL2 pipeline: point lights, bloom, film grade |
+| `js/world.js` | Harbor City map, collision, world rendering |
 | `js/entities.js` | Player, truck, NPCs, police AI, combat |
 | `js/dialogue.js` | Dialogue tree engine |
 | `js/speakeasy.js` | The Tiger: demand model, raids, nightly ledger |
