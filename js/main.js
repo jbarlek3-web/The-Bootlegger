@@ -10,6 +10,7 @@
   function boot() {
     B.buildTextures();
     B.buildTruckSprite();
+    B.loadArt();
     B.buildWorld();
     B.makePlayer();
     B.makeTruck();
@@ -62,38 +63,34 @@
       return { label: 'The truck is O\'Banion\'s prize for now', act: () => B.toast('Not with Deacon\'s boys watching. Settle it at the garage office.') };
     }
 
-    // named NPCs (not peds, not hostiles mid-brawl)
-    let best = null, bestD = 1.7;
+    // gather all candidates and take the closest — a door underfoot must win
+    // over a bystander loitering beside it, and vice versa
+    let best = null, bestD = Infinity;
+    const consider = (d, maxD, cand) => { if (d < maxD && d < bestD) { best = cand; bestD = d; } };
+
     for (const n of B.npcs) {
-      if (n.hidden || !n.id || n.kind === 'patrolcar') continue;
+      if (n.hidden || n.kind === 'patrolcar') continue;
       if (n.kind === 'thug' && n.hostile) continue;
       const d = B.dist(p.x, p.y, n.x, n.y);
-      if (d < bestD) { best = n; bestD = d; }
-    }
-    if (best) {
-      const talk = () => {
-        const dlg = B.dialogues[best.id];
-        if (dlg) B.openDialogue(dlg());
-        B.emit('talk', best.id);
-      };
-      return { label: 'E — talk to ' + best.name, act: talk };
-    }
-
-    // pedestrians
-    for (const n of B.npcs) {
-      if (n.hidden || n.kind !== 'ped') continue;
-      if (B.dist(p.x, p.y, n.x, n.y) < 1.5) {
-        return { label: 'E — talk to the ' + n.name.toLowerCase(), act: () => B.openDialogue(B.pedDialogue(n)) };
+      if (n.id) {
+        consider(d, 1.7, {
+          label: 'E — talk to ' + n.name,
+          act: () => {
+            const dlg = B.dialogues[n.id];
+            if (dlg) B.openDialogue(dlg());
+            B.emit('talk', n.id);
+          },
+        });
+      } else if (n.kind === 'ped') {
+        consider(d, 1.5, { label: 'E — talk to the ' + n.name.toLowerCase(), act: () => B.openDialogue(B.pedDialogue(n)) });
       }
     }
 
-    // doors
     for (const d of B.doors) {
-      if (B.dist(p.x, p.y, d.x + 0.5, d.y + 0.5) < 1.9) {
-        return { label: 'E — ' + d.label, act: () => B.doorAction(d.id) };
-      }
+      consider(B.dist(p.x, p.y, d.x + 0.5, d.y + 0.5), 1.9,
+        { label: 'E — ' + d.label, act: () => B.doorAction(d.id) });
     }
-    return null;
+    return best;
   }
 
   function enterTruck() {

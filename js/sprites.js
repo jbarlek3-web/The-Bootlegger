@@ -195,8 +195,21 @@
 
   /* draw a person at screen px,py (feet anchor), with walk phase + facing flip */
   B.drawSprite = function (ctx, n, px, py) {
-    const strip = B.spriteFor(n);
     const moving = (B.frame - (n._lastMove || -99)) < 4;
+    if (n === B.player && B.ART) {
+      // the hero from the reference sheet — its figures face left
+      const img = moving ? B.ART.walk[Math.floor((n.walk || 0) * 4) % 4] : B.ART.idle;
+      const flipR = Math.cos(n.facing || 0) > 0.05;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(0, 9, 10, 3.6, 0, 0, 7); ctx.fill();
+      if (flipR) ctx.scale(-1, 1);
+      ctx.drawImage(img, -img.width / 2, -img.height + 10);
+      ctx.restore();
+      return;
+    }
+    const strip = B.spriteFor(n);
     const seq = [1, 0, 3, 0];              // stepL, pass, stepR, pass
     const f = moving ? seq[Math.floor((n.walk || 0) * 3) % 4] : 0;
     const flip = Math.cos(n.facing || 0) < -0.05;
@@ -208,6 +221,54 @@
     if (flip) ctx.scale(-1, 1);
     ctx.drawImage(strip, f * W * SCALE, 0, W * SCALE, H * SCALE, -W / 2 - 1, -H + 10, W + 2, H + 2);
     ctx.restore();
+  };
+
+  /* ---------------- reference art assets ----------------
+   * The hero and props come from the uploaded reference sheet, keyed and
+   * sliced into assets/sprites/. Loaded async; until then (or on file://
+   * where local images would taint the canvas and break the WebGL upload)
+   * the procedural sprites above stand in. */
+  B.ART = null;
+  B.loadArt = function () {
+    const files = {
+      idle: 'assets/sprites/player-idle.png',
+      w1: 'assets/sprites/player-walk1.png',
+      w2: 'assets/sprites/player-walk2.png',
+      w3: 'assets/sprites/player-walk3.png',
+      w4: 'assets/sprites/player-walk4.png',
+      crate: 'assets/sprites/crate.png',
+      sign: 'assets/sprites/sign-kentucky.png',
+    };
+    const imgs = {};
+    let left = Object.keys(files).length, failed = false;
+    const finish = () => {
+      if (failed) return;
+      // taint test: if reading back throws, using these would kill the GL pipeline
+      try {
+        const t = cv(4, 4);
+        const g = t.getContext('2d');
+        g.drawImage(imgs.idle, 0, 0, 4, 4);
+        g.getImageData(0, 0, 1, 1);
+      } catch (e) { return; }
+      const scaled = (img, h) => {
+        const w = Math.round(img.width * (h / img.height));
+        const c = cv(w, h);
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        return c;
+      };
+      B.ART = {
+        idle: scaled(imgs.idle, 46),
+        walk: [imgs.w1, imgs.w2, imgs.w3, imgs.w4].map(i => scaled(i, 46)),
+        crate: scaled(imgs.crate, 26),
+        sign: scaled(imgs.sign, 34),
+      };
+    };
+    for (const [k, src] of Object.entries(files)) {
+      const im = new Image();
+      im.onload = () => { imgs[k] = im; if (--left === 0) finish(); };
+      im.onerror = () => { failed = true; };
+      im.src = src;
+    }
   };
 
   /* ---------------- the truck ---------------- */

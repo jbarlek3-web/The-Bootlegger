@@ -305,6 +305,9 @@
       if (b.named) {
         if (b.name === 'Café Roma') drawMarquee(ctx, bx, by, bw, bh, dark);
         else drawSignboard(ctx, b, bx, by, bw, bh);
+        if (b.name === 'Hollis Farm' && B.ART) {         // the KENTUCKY BEST board
+          ctx.drawImage(B.ART.sign, bx + bw - B.ART.sign.width - 4, by + bh - facH - B.ART.sign.height + 18);
+        }
       } else if (B.dist(pxp, pyp, b.x + b.w / 2, b.y + b.h / 2) < 8) {
         ctx.font = '11px Georgia'; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(232,220,192,0.7)';
@@ -370,15 +373,21 @@
         ctx.fillStyle = '#241a10';
         ctx.fillRect(dx + 2, dy + 17, 3, 5); ctx.fillRect(dx + 25, dy + 17, 3, 5);
       } else if (d.type === 'crate') {
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(dx + 3, dy + 22, 24, 4);
-        ctx.fillStyle = '#7a5c30';
-        ctx.fillRect(dx + 4, dy + 4, 20, 20);
-        ctx.strokeStyle = '#191410'; ctx.lineWidth = 1.5;
-        ctx.strokeRect(dx + 4, dy + 4, 20, 20);
-        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(dx + 4, dy + 4); ctx.lineTo(dx + 24, dy + 24);
-        ctx.moveTo(dx + 24, dy + 4); ctx.lineTo(dx + 4, dy + 24); ctx.stroke();
+        if (B.ART) {
+          ctx.fillStyle = 'rgba(0,0,0,0.25)';
+          ctx.beginPath(); ctx.ellipse(dx + 16, dy + 26, 13, 4, 0, 0, 7); ctx.fill();
+          ctx.drawImage(B.ART.crate, dx + 3, dy + 2);
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,0.25)';
+          ctx.fillRect(dx + 3, dy + 22, 24, 4);
+          ctx.fillStyle = '#7a5c30';
+          ctx.fillRect(dx + 4, dy + 4, 20, 20);
+          ctx.strokeStyle = '#191410'; ctx.lineWidth = 1.5;
+          ctx.strokeRect(dx + 4, dy + 4, 20, 20);
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(dx + 4, dy + 4); ctx.lineTo(dx + 24, dy + 24);
+          ctx.moveTo(dx + 24, dy + 4); ctx.lineTo(dx + 4, dy + 24); ctx.stroke();
+        }
       } else if (d.type === 'poster') {
         const p = B.TEX.posters[d.idx % B.TEX.posters.length];
         ctx.save();

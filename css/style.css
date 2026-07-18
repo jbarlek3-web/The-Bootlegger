@@ -198,6 +198,11 @@ canvas#glout {
 #title-screen, #flash-overlay {
   position: absolute; inset: 0;
   background: radial-gradient(ellipse at center, #2a2013 0%, #0d0b08 75%);
+}
+#title-screen {
+  background:
+    linear-gradient(rgba(10, 8, 5, 0.72), rgba(10, 8, 5, 0.85)),
+    url('../assets/title-bg.jpg') center / cover no-repeat;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   text-align: center;
