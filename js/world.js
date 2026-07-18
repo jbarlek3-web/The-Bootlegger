@@ -1,5 +1,7 @@
 'use strict';
-/* The Bootlegger — world: Harbor City map, named locations, collision, tile rendering */
+/* The Bootlegger — world: Harbor City map, named locations, collision, rendering.
+ * Rendering draws pre-baked procedural textures (see textures.js): cobbled
+ * roads, brick facades with lit windows, roofs, marquee signage, posters. */
 
 (function () {
   const T = B.T, W = B.MAP_W, H = B.MAP_H;
@@ -7,7 +9,7 @@
   B.map = new Uint8Array(W * H);
   B.buildings = [];   // {x,y,w,h,name,color,named}
   B.doors = [];       // {x,y,id,label} interaction points (tile coords)
-  B.decor = [];       // {x,y,type:'tree'|'lamp'|'bench'|'crate'|'hydrant'}
+  B.decor = [];       // {x,y,type:'tree'|'lamp'|'bench'|'crate'|'poster'|'vent'}
   B.zones = [];       // {x,y,w,h,id} trigger rectangles
 
   const tile = (x, y) => B.map[y * W + x];
@@ -98,9 +100,7 @@
     addDoor(93, 82, 'union', 'Longshoremen Union Hall');
 
     addBuilding(47, 2, 7, 6, 'Border Warehouse', '#43503f', true);
-    addDoor(53, 5, 'border', 'Border Warehouse');
-    // border door faces the highway: put it on the east wall (tile just inside road)
-    B.doors[B.doors.length - 1].x = 54; B.doors[B.doors.length - 1].y = 5;
+    addDoor(54, 5, 'border', 'Border Warehouse');
 
     addBuilding(90, 4, 6, 5, 'Hollis Farm', '#6d5b35', true);
     addDoor(89, 6, 'farm', 'Hollis Farm');
@@ -135,24 +135,36 @@
     }
 
     /* ---------- decor ---------- */
-    // park trees + benches
     for (let i = 0; i < 10; i++) B.decor.push({ x: 59 + rng() * 9, y: 61 + rng() * 9, type: 'tree' });
     B.decor.push({ x: 61, y: 65, type: 'bench' }, { x: 66, y: 65, type: 'bench' });
-    // rural trees
     for (let i = 0; i < 40; i++) {
       const x = rng() * 110, y = rng() * 19;
       if (B.tileAt(x, y) === T.GRASS) B.decor.push({ x, y, type: 'tree' });
     }
-    // lampposts at city intersections
     VX.forEach(x => HY.forEach(y => B.decor.push({ x: x - 0.5, y: y - 0.5, type: 'lamp' })));
-    // dock crates
     for (let i = 0; i < 6; i++) B.decor.push({ x: 103 + rng() * 3, y: 60 + rng() * 18, type: 'crate' });
+
+    /* tattered posters on chosen facades, and steam vents in the alleys */
+    B.decor.push(
+      { x: 11.2, y: 34.1, type: 'poster', idx: 0 },   // garage — PROHIBITION
+      { x: 17.1, y: 34.1, type: 'poster', idx: 2 },   // garage — WANTED
+      { x: 12.4, y: 84.1, type: 'poster', idx: 3 },   // tenements — Old Crow
+      { x: 18.3, y: 84.1, type: 'poster', idx: 0 },
+      { x: 91.2, y: 81.1, type: 'poster', idx: 1 },   // union hall — VOTE DRY
+      { x: 65.4, y: 50.1, type: 'poster', idx: 2 },   // precinct — WANTED
+      { x: 43.2, y: 67.1, type: 'poster', idx: 0 },   // café roma front
+      { x: 75.3, y: 33.1, type: 'poster', idx: 1 },   // herald
+    );
+    B.decor.push(
+      { x: 52.4, y: 64.6, type: 'vent' },             // the Tiger's alley
+      { x: 103.5, y: 66.5, type: 'vent' },            // docks
+      { x: 21.4, y: 82.5, type: 'vent' },             // tenements alley
+    );
 
     /* ---------- trigger zones ---------- */
     B.zones.push({ x: 53, y: 15, w: 5, h: 3, id: 'checkpoint' });   // Route 9 federal checkpoint
     B.zones.push({ x: 41, y: 59, w: 12, h: 10, id: 'tigerblock' });
 
-    /* solid decor lookup for trees */
     B.treeSolid = B.decor.filter(d => d.type === 'tree');
   };
 
@@ -176,115 +188,284 @@
   };
 
   /* ================= rendering ================= */
-  const TILE_COLORS = {
-    [T.GRASS]: '#3d5233', [T.ROAD]: '#3b3833', [T.WALK]: '#8c8272',
-    [T.BUILDING]: '#5a4632', [T.WATER]: '#27435c', [T.DIRT]: '#6a5638',
-    [T.PIER]: '#7d6644', [T.FARM]: '#75603a', [T.PARK]: '#46603a',
-  };
+
+  /* deterministic per-window "is the light on tonight" */
+  function windowLit(bx, wx, hour) {
+    const h = ((bx * 73 + wx * 131) % 97) / 97;
+    return h < 0.55 + (hour >= 23 || hour < 5 ? -0.25 : 0);
+  }
 
   B.renderWorld = function (ctx, cam) {
     const ts = B.TILE;
     const x0 = Math.max(0, Math.floor(cam.x)), y0 = Math.max(0, Math.floor(cam.y));
     const x1 = Math.min(W, Math.ceil(cam.x + B.VIEW_W / ts)), y1 = Math.min(H, Math.ceil(cam.y + B.VIEW_H / ts));
+    const dark = B.darkness();
 
+    /* ---- ground ---- */
     for (let j = y0; j < y1; j++) {
       for (let i = x0; i < x1; i++) {
         const t = tile(i, j);
-        ctx.fillStyle = TILE_COLORS[t];
         const px = (i - cam.x) * ts, py = (j - cam.y) * ts;
-        ctx.fillRect(px, py, ts + 1, ts + 1);
-        if (t === T.ROAD && (i + j) % 4 === 0) {           // faint cobble seams
-          ctx.fillStyle = 'rgba(0,0,0,0.08)';
-          ctx.fillRect(px, py, ts, 2);
+        if (t === T.BUILDING) { continue; }                  // painted with its building
+        const variants = B.TEX.tile[t];
+        if (variants) {
+          ctx.drawImage(variants[(i * 7 + j * 13) % variants.length], px, py);
+        } else {
+          ctx.fillStyle = '#444'; ctx.fillRect(px, py, ts, ts);
         }
         if (t === T.WATER && (i * 7 + j * 13 + (B.frame >> 5)) % 11 === 0) {
-          ctx.fillStyle = 'rgba(255,255,255,0.07)';
+          ctx.fillStyle = 'rgba(255,255,255,0.09)';
           ctx.fillRect(px + 6, py + 14, 14, 2);
         }
-        if (t === T.FARM && j % 2 === 0) {
-          ctx.fillStyle = 'rgba(0,0,0,0.1)';
-          ctx.fillRect(px, py + 12, ts, 3);
+      }
+    }
+
+    /* wet sheen down the middle of night roads */
+    if (dark > 0.3) {
+      ctx.fillStyle = 'rgba(140,170,220,0.05)';
+      for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) {
+        if (tile(i, j) === T.ROAD && (i + j) % 3 === 0) {
+          ctx.fillRect((i - cam.x) * ts + 8, (j - cam.y) * ts + 10, 18, 3);
         }
       }
     }
 
-    /* road center dashes */
-    ctx.fillStyle = 'rgba(220,210,180,0.14)';
-    for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) {
-      if (tile(i, j) !== T.ROAD) continue;
-      const vC = i > 0 && tile(i - 1, j) === T.ROAD && i < W - 1 && tile(i + 1, j) === T.ROAD;
-      const hC = j > 0 && tile(i, j - 1) === T.ROAD && j < H - 1 && tile(i, j + 1) === T.ROAD;
-      if (vC && hC && j % 2 === 0 && i % 2 === 0) ctx.fillRect((i - cam.x) * ts + 14, (j - cam.y) * ts + 14, 4, 4);
-    }
-
-    /* buildings */
-    const px = B.player ? B.player.x : 0, py = B.player ? B.player.y : 0;
+    /* ---- buildings: roof + brick facade + windows + signage ---- */
+    const hour = B.hour();
+    const pxp = B.player ? B.player.x : 0, pyp = B.player ? B.player.y : 0;
     for (const b of B.buildings) {
       if (b.x + b.w < cam.x - 1 || b.x > cam.x + B.VIEW_W / ts + 1) continue;
-      if (b.y + b.h < cam.y - 1 || b.y > cam.y + B.VIEW_H / ts + 1) continue;
+      if (b.y + b.h < cam.y - 2 || b.y > cam.y + B.VIEW_H / ts + 1) continue;
       const bx = (b.x - cam.x) * ts, by = (b.y - cam.y) * ts;
-      ctx.fillStyle = b.color;
-      ctx.fillRect(bx, by, b.w * ts, b.h * ts);
-      // roof shading + parapet
-      ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fillRect(bx, by, b.w * ts, 6);
-      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bx + 1, by + 1, b.w * ts - 2, b.h * ts - 2);
-      // skylight grid on big roofs
-      if (b.w >= 6) {
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
-        for (let k = 1; k < b.w - 1; k += 2) ctx.fillRect(bx + k * ts + 8, by + ts, 12, 12);
+      const bw = b.w * ts, bh = b.h * ts;
+      const facH = ts;                                       // bottom row is the street face
+
+      /* roof — dark tar and gravel */
+      ctx.fillStyle = B.shade(b.color, -0.58);
+      ctx.fillRect(bx, by, bw, bh - facH);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';                    // tar seams
+      for (let yy = by + 22; yy < by + bh - facH - 6; yy += 26) ctx.fillRect(bx + 4, yy, bw - 8, 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';              // gravel sparkle
+      for (let k = 0; k < b.w * (b.h - 1) * 2; k += 2) {
+        ctx.fillRect(bx + (k * 37 % bw), by + (k * 53 % Math.max(1, bh - facH)), 2, 2);
       }
-      // label when the player is close
-      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-      if (b.named || B.dist(px, py, cx, cy) < 9) {
-        ctx.font = (b.named ? 'bold 13px' : '11px') + ' Georgia';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = b.named ? '#e8d9a0' : 'rgba(232,220,192,0.75)';
-        ctx.fillText(b.name, bx + b.w * ts / 2, by + b.h * ts / 2 + 4);
+      // parapet rim
+      ctx.strokeStyle = B.shade(b.color, -0.25);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(bx + 1.5, by + 1.5, bw - 3, bh - facH - 1);
+      // skylights + roof furniture
+      if (b.w >= 5 && b.h >= 4) {
+        for (let k = 1; k < b.w - 1; k += 2) {
+          ctx.fillStyle = 'rgba(20,30,40,0.8)';
+          ctx.fillRect(bx + k * ts + 8, by + ts, 14, 14);
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+          ctx.strokeRect(bx + k * ts + 8, by + ts, 14, 14);
+        }
+        // chimney
+        ctx.fillStyle = B.shade(b.color, -0.55);
+        ctx.fillRect(bx + bw - 18, by + 8, 10, 10);
+      }
+
+      /* cornice */
+      ctx.fillStyle = B.shade(b.color, 0.18);
+      ctx.fillRect(bx, by + bh - facH - 5, bw, 5);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(bx, by + bh - facH, bw, 3);               // drop shadow under cornice
+
+      /* brick facade */
+      const brick = B.TEX.brickFor(b.color);
+      for (let x = 0; x < bw; x += 64) {
+        ctx.drawImage(brick, 0, 0, Math.min(64, bw - x), facH, bx + x, by + bh - facH, Math.min(64, bw - x), facH);
+      }
+
+      /* windows along the facade */
+      const nWin = Math.max(1, b.w - 1);
+      for (let k = 0; k < nWin; k++) {
+        const wx = bx + (k + 0.5) * (bw / nWin) - 5;
+        const lit = dark > 0.25 && windowLit(b.x + b.y * 7, k, hour);
+        ctx.fillStyle = lit ? 'rgba(255,196,110,0.95)' : '#1d2732';
+        ctx.fillRect(wx, by + bh - facH + 7, 10, 15);
+        ctx.strokeStyle = '#191410'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(wx, by + bh - facH + 7, 10, 15);
+        ctx.beginPath(); ctx.moveTo(wx, by + bh - facH + 14.5); ctx.lineTo(wx + 10, by + bh - facH + 14.5); ctx.stroke();
+        ctx.fillStyle = B.shade(b.color, 0.25);              // sill
+        ctx.fillRect(wx - 1, by + bh - facH + 22, 12, 2);
+        if (lit) {                                           // spill onto the pavement
+          ctx.fillStyle = 'rgba(255,190,100,0.10)';
+          ctx.fillRect(wx - 3, by + bh, 16, 10);
+        }
+      }
+
+      /* outline */
+      ctx.strokeStyle = 'rgba(10,8,5,0.75)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
+
+      /* signage */
+      if (b.named) {
+        if (b.name === 'Café Roma') drawMarquee(ctx, bx, by, bw, bh, dark);
+        else drawSignboard(ctx, b, bx, by, bw, bh);
+      } else if (B.dist(pxp, pyp, b.x + b.w / 2, b.y + b.h / 2) < 8) {
+        ctx.font = '11px Georgia'; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(232,220,192,0.7)';
+        ctx.fillText(b.name, bx + bw / 2, by + bh - facH - 10);
       }
     }
 
-    /* doors */
+    /* ---- doors ---- */
     for (const d of B.doors) {
       const dx = (d.x - cam.x) * ts, dy = (d.y - cam.y) * ts;
-      if (dx < -ts || dy < -ts || dx > B.VIEW_W || dy > B.VIEW_H) continue;
-      ctx.fillStyle = '#241a10';
-      ctx.fillRect(dx + 8, dy + 6, ts - 16, ts - 12);
-      ctx.fillStyle = '#c9a227';
-      ctx.fillRect(dx + ts - 13, dy + ts / 2 - 1, 3, 3);
+      if (dx < -ts * 2 || dy < -ts * 2 || dx > B.VIEW_W + ts || dy > B.VIEW_H + ts) continue;
+      // recessed doorway
+      ctx.fillStyle = '#0f0b07';
+      ctx.fillRect(dx + 6, dy + 2, ts - 12, ts - 8);
+      ctx.fillStyle = '#3a2a18';                             // wooden door
+      ctx.fillRect(dx + 8, dy + 4, ts - 16, ts - 10);
+      ctx.strokeStyle = '#191410'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(dx + 8, dy + 4, ts - 16, ts - 10);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(dx + 8, dy + 4, ts - 16, 3);
+      ctx.fillStyle = '#c9a227';                             // knob
+      ctx.beginPath(); ctx.arc(dx + ts - 12, dy + ts / 2, 1.8, 0, 7); ctx.fill();
+      // step
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(dx + 5, dy + ts - 5, ts - 10, 3);
+      // the Tiger's alley door gets its telltale red bulb after dark
+      if (d.id === 'tigerback' && B.state && B.state.speakeasy.openForBusiness && dark > 0.3) {
+        ctx.fillStyle = '#ff4433';
+        ctx.beginPath(); ctx.arc(dx + ts / 2, dy + 1, 3, 0, 7); ctx.fill();
+      }
     }
 
-    /* decor */
+    /* ---- decor ---- */
     for (const d of B.decor) {
       const dx = (d.x - cam.x) * ts, dy = (d.y - cam.y) * ts;
-      if (dx < -ts * 2 || dy < -ts * 2 || dx > B.VIEW_W + ts || dy > B.VIEW_H + ts) continue;
+      if (dx < -ts * 3 || dy < -ts * 3 || dx > B.VIEW_W + ts * 2 || dy > B.VIEW_H + ts * 2) continue;
       if (d.type === 'tree') {
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(dx + 16, dy + 27, 11, 4, 0, 0, 7); ctx.fill();
         ctx.fillStyle = '#3a2c1a';
-        ctx.fillRect(dx + 13, dy + 16, 6, 12);
-        ctx.fillStyle = '#2f4a26';
-        ctx.beginPath(); ctx.arc(dx + 16, dy + 12, 13, 0, 7); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.beginPath(); ctx.arc(dx + 12, dy + 8, 6, 0, 7); ctx.fill();
+        ctx.fillRect(dx + 13, dy + 14, 6, 14);
+        ctx.fillStyle = '#263d1f';
+        ctx.beginPath(); ctx.arc(dx + 16, dy + 10, 14, 0, 7); ctx.fill();
+        ctx.fillStyle = '#33512a';
+        ctx.beginPath(); ctx.arc(dx + 13, dy + 8, 10, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.beginPath(); ctx.arc(dx + 11, dy + 5, 5, 0, 7); ctx.fill();
+        ctx.strokeStyle = 'rgba(10,8,5,0.5)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(dx + 16, dy + 10, 14, 0, 7); ctx.stroke();
       } else if (d.type === 'lamp') {
-        ctx.fillStyle = '#222';
-        ctx.fillRect(dx + 14, dy + 6, 4, 22);
-        ctx.fillStyle = B.darkness() > 0.2 ? '#ffd76a' : '#665f3f';
-        ctx.beginPath(); ctx.arc(dx + 16, dy + 5, 4, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(dx + 16, dy + 29, 6, 2.5, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#1c1a17';
+        ctx.fillRect(dx + 14.5, dy + 4, 3, 25);
+        ctx.fillRect(dx + 10, dy + 6, 12, 2);                // crossarm
+        ctx.fillStyle = dark > 0.15 ? '#ffd76a' : '#5c563c';
+        ctx.beginPath(); ctx.arc(dx + 16, dy + 3.5, 4, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#191410'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(dx + 16, dy + 3.5, 4, 0, 7); ctx.stroke();
       } else if (d.type === 'bench') {
         ctx.fillStyle = '#4a371f';
-        ctx.fillRect(dx, dy + 10, 30, 8);
+        ctx.fillRect(dx, dy + 10, 30, 7);
+        ctx.fillStyle = '#241a10';
+        ctx.fillRect(dx + 2, dy + 17, 3, 5); ctx.fillRect(dx + 25, dy + 17, 3, 5);
       } else if (d.type === 'crate') {
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(dx + 3, dy + 22, 24, 4);
         ctx.fillStyle = '#7a5c30';
         ctx.fillRect(dx + 4, dy + 4, 20, 20);
-        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.strokeStyle = '#191410'; ctx.lineWidth = 1.5;
         ctx.strokeRect(dx + 4, dy + 4, 20, 20);
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(dx + 4, dy + 4); ctx.lineTo(dx + 24, dy + 24);
+        ctx.moveTo(dx + 24, dy + 4); ctx.lineTo(dx + 4, dy + 24); ctx.stroke();
+      } else if (d.type === 'poster') {
+        const p = B.TEX.posters[d.idx % B.TEX.posters.length];
+        ctx.save();
+        ctx.translate(dx, dy);
+        ctx.rotate((d.idx % 2 ? -1 : 1) * 0.03);
+        ctx.drawImage(p, 0, 0, p.width * 0.62, p.height * 0.62);
+        ctx.restore();
       }
+      // vents render nothing static — their steam lives in renderAtmosphere
     }
   };
 
-  /* night overlay + lamp glow */
+  function drawSignboard(ctx, b, bx, by, bw, bh) {
+    const label = b.name.toUpperCase();
+    ctx.font = 'bold 11px Georgia';
+    const tw = Math.min(bw - 10, ctx.measureText(label).width + 14);
+    const sx = bx + bw / 2 - tw / 2, sy = by + bh - B.TILE - 3;
+    ctx.fillStyle = '#241b10';
+    ctx.fillRect(sx, sy - 8, tw, 14);
+    ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 1;
+    ctx.strokeRect(sx + 1, sy - 7, tw - 2, 12);
+    ctx.fillStyle = '#e0c46a';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, bx + bw / 2, sy + 2, tw - 8);
+  }
+
+  function drawMarquee(ctx, bx, by, bw, bh, dark) {
+    const sy = by + bh - B.TILE - 6;
+    const tw = Math.min(bw - 8, 118);
+    const sx = bx + bw / 2 - tw / 2;
+    // board
+    ctx.fillStyle = '#1c130c';
+    ctx.fillRect(sx, sy - 12, tw, 20);
+    ctx.strokeStyle = '#3a2a18'; ctx.lineWidth = 2;
+    ctx.strokeRect(sx, sy - 12, tw, 20);
+    // bulbs around the rim — bright at night so the bloom pass catches them
+    const on = dark > 0.2;
+    ctx.fillStyle = on ? '#ffe28a' : '#6b5a33';
+    for (let x = sx + 4; x < sx + tw - 2; x += 8) {
+      ctx.beginPath(); ctx.arc(x, sy - 10, 1.6, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, sy + 6, 1.6, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = on ? '#ffdf7e' : '#c9b184';
+    ctx.font = 'bold 12px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText('CAFÉ ROMA', bx + bw / 2, sy + 2);
+  }
+
+  /* ---- drifting harbor fog + alley steam, drawn over entities ---- */
+  const FOG = [];
+  for (let i = 0; i < 9; i++) {
+    FOG.push({ seed: i * 977 % 613, sy: (i * 331) % 720, sp: 0.12 + (i % 4) * 0.06, sc: 0.7 + (i % 3) * 0.45 });
+  }
+
+  B.renderAtmosphere = function (ctx, cam) {
+    const dark = B.darkness();
+    const alpha = 0.028 + dark * 0.05;
+    ctx.save();
+    for (const f of FOG) {
+      const x = ((f.seed * 3 + B.frame * f.sp) % (B.VIEW_W + 700)) - 350;
+      const y = f.sy + Math.sin((B.frame + f.seed) * 0.004) * 40;
+      const rx = 260 * f.sc, ry = 70 * f.sc;
+      const g = ctx.createRadialGradient(x, y, 10, x, y, rx);
+      g.addColorStop(0, 'rgba(190,200,215,' + alpha + ')');
+      g.addColorStop(1, 'rgba(190,200,215,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7); ctx.fill();
+    }
+    // steam columns from the vents
+    const ts = B.TILE;
+    for (const d of B.decor) {
+      if (d.type !== 'vent') continue;
+      const dx = (d.x - cam.x) * ts, dy = (d.y - cam.y) * ts;
+      if (dx < -80 || dy < -80 || dx > B.VIEW_W + 80 || dy > B.VIEW_H + 80) continue;
+      for (let k = 0; k < 4; k++) {
+        const t = ((B.frame * 0.9 + k * 34) % 130);
+        const a = (1 - t / 130) * 0.16;
+        ctx.fillStyle = 'rgba(210,210,215,' + a.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(dx + Math.sin((B.frame + k * 50) * 0.03) * 6, dy - t, 5 + t * 0.14, 0, 7);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  };
+
+  /* 2D lighting overlay — fallback when WebGL2 is unavailable */
   B.renderLight = function (ctx, cam) {
     const dark = B.darkness();
     if (dark <= 0.01) return;
@@ -302,7 +483,6 @@
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(dx, dy, 90, 0, 7); ctx.fill();
     }
-    // glow at the Tiger when open at night
     if (B.state && B.state.speakeasy.openForBusiness && B.isNight() && !B.state.speakeasy.closedTonight) {
       const dx = (51.5 - cam.x) * ts, dy = (63.5 - cam.y) * ts;
       const g = ctx.createRadialGradient(dx, dy, 4, dx, dy, 70);

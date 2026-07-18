@@ -8,6 +8,8 @@
 
   /* ================= boot ================= */
   function boot() {
+    B.buildTextures();
+    B.buildTruckSprite();
     B.buildWorld();
     B.makePlayer();
     B.makeTruck();
@@ -22,6 +24,8 @@
     cont.addEventListener('click', () => {
       if (B.loadGame()) startPlay();
     });
+
+    B.initGlfx(canvas);
 
     requestAnimationFrame(loop);
   }
@@ -185,7 +189,20 @@
     ctx.clearRect(0, 0, B.VIEW_W, B.VIEW_H);
     B.renderWorld(ctx, cam);
     B.renderEntities(ctx, cam);
-    B.renderLight(ctx, cam);
+    B.renderAtmosphere(ctx, cam);
+
+    // WebGL relight + bloom + film pass; 2D overlay is the fallback.
+    // F2 debug shows the raw unprocessed frame.
+    const glOut = document.getElementById('glout');
+    if (B.glfx && B.glfx.ok && !B.debugOn) {
+      glOut.classList.remove('hidden');
+      const dark = B.darkness();
+      B.glfx.render(B.collectLights(cam), 1.04 - dark * 0.82, dark / 0.72);
+    } else {
+      glOut.classList.add('hidden');
+      B.renderLight(ctx, cam);
+    }
+
     B.renderMinimap();
     B.refreshHUD();
     if (B.debugOn) renderDebug(dt);
@@ -227,6 +244,8 @@
     cam.y = 45 + Math.cos(t * 0.7) * 15;
     ctx.clearRect(0, 0, B.VIEW_W, B.VIEW_H);
     B.renderWorld(ctx, cam);
+    B.renderAtmosphere(ctx, cam);
+    if (B.glfx && B.glfx.ok) B.glfx.render([], 1.0, 0);
   }
 
   boot();
