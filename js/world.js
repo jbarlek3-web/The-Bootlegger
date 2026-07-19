@@ -165,6 +165,28 @@
     B.zones.push({ x: 53, y: 15, w: 5, h: 3, id: 'checkpoint' });   // Route 9 federal checkpoint
     B.zones.push({ x: 41, y: 59, w: 12, h: 10, id: 'tigerblock' });
 
+    /* neon shop signs on a handful of downtown storefronts (reference: HOTEL /
+     * CLOVER CLUB verticals, glowing marquees everywhere) */
+    const neonTexts = [['DINER', '#ff5a4a'], ['CIGARS', '#ffb84a'], ['BILLIARDS', '#4affc8'],
+      ['ROOMS', '#ff4a88'], ['SODA', '#6ad4ff'], ['BARBER', '#ff6a5a']];
+    let neonI = 0;
+    for (const b of B.buildings) {
+      if (b.named || b.y > 55 || b.w < 4) continue;
+      if (((b.x * 31 + b.y * 17) % 7) < 3 && neonI < neonTexts.length) {
+        b.neon = { text: neonTexts[neonI][0], color: neonTexts[neonI][1] };
+        neonI++;
+      }
+    }
+
+    /* barrels and police-line dressing from the props sheets */
+    for (let i = 0; i < 5; i++) B.decor.push({ x: 103.2 + (i % 2) * 1.1, y: 77.5 + i * 0.9, type: 'barrel' });
+    B.decor.push(
+      { x: 19.3, y: 35.2, type: 'barrel' }, { x: 20.1, y: 34.4, type: 'barrel' },   // garage side
+      { x: 96.3, y: 8.6, type: 'barrel' }, { x: 95.4, y: 9.4, type: 'barrel' },     // farm still
+      { x: 55.3, y: 6.2, type: 'barrel' },                                          // border warehouse
+      { x: 60.2, y: 52.1, type: 'policeline' },                                     // precinct steps
+    );
+
     B.treeSolid = B.decor.filter(d => d.type === 'tree');
   };
 
@@ -220,11 +242,12 @@
       }
     }
 
-    /* wet sheen down the middle of night roads */
-    if (dark > 0.3) {
-      ctx.fillStyle = 'rgba(140,170,220,0.05)';
+    /* wet sheen on the roads — nightly, and all day in the rain */
+    const raining = B.state && B.state.weather === 'rain';
+    if (dark > 0.3 || raining) {
+      ctx.fillStyle = raining ? 'rgba(150,180,225,0.10)' : 'rgba(140,170,220,0.05)';
       for (let j = y0; j < y1; j++) for (let i = x0; i < x1; i++) {
-        if (tile(i, j) === T.ROAD && (i + j) % 3 === 0) {
+        if (tile(i, j) === T.ROAD && (i + j) % (raining ? 2 : 3) === 0) {
           ctx.fillRect((i - cam.x) * ts + 8, (j - cam.y) * ts + 10, 18, 3);
         }
       }
@@ -301,6 +324,58 @@
       ctx.lineWidth = 2;
       ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
 
+      /* neon storefront sign */
+      if (b.neon) {
+        const on = dark > 0.18;
+        ctx.font = 'bold 10px Georgia';
+        const tw = ctx.measureText(b.neon.text).width + 10;
+        const sx = bx + 6, sy = by + bh - facH - 2;
+        ctx.fillStyle = '#14100c';
+        ctx.fillRect(sx, sy - 10, tw, 13);
+        ctx.fillStyle = on ? b.neon.color : 'rgba(120,110,100,0.8)';
+        ctx.textAlign = 'left';
+        ctx.fillText(b.neon.text, sx + 5, sy);
+        if (on) {                                          // glow core for the bloom pass
+          ctx.fillStyle = 'rgba(255,255,255,0.55)';
+          ctx.fillText(b.neon.text, sx + 5, sy);
+          ctx.fillStyle = b.neon.color;
+          ctx.globalAlpha = 0.6;
+          ctx.fillText(b.neon.text, sx + 5.6, sy);
+          ctx.globalAlpha = 1;
+        }
+        ctx.textAlign = 'center';
+      }
+
+      /* the Ambassador's vertical HOTEL neon, straight off the reference */
+      if (b.name === 'Grand Hotel Ambassador') {
+        const on = dark > 0.18;
+        const nx = bx + bw - 20, ny0 = by + bh - facH - 64;
+        ctx.fillStyle = '#171310';
+        ctx.fillRect(nx, ny0, 16, 62);
+        ctx.strokeStyle = '#3a2a18'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(nx, ny0, 16, 62);
+        ctx.font = 'bold 10px Georgia';
+        'HOTEL'.split('').forEach((ch, k) => {
+          ctx.fillStyle = on ? '#ff4a3a' : '#6b4038';
+          ctx.fillText(ch, nx + 8, ny0 + 12 + k * 11);
+          if (on) {
+            ctx.fillStyle = 'rgba(255,230,220,0.7)';
+            ctx.fillText(ch, nx + 8, ny0 + 12 + k * 11);
+          }
+        });
+      }
+
+      /* blue globes flanking the precinct door */
+      if (b.name === 'Police Precinct No. 4') {
+        const gy = by + bh - facH + 4;
+        for (const gx of [bx + bw / 2 - 26, bx + bw / 2 + 26]) {
+          ctx.fillStyle = dark > 0.18 ? '#6ab4ff' : '#3a5a7c';
+          ctx.beginPath(); ctx.arc(gx, gy, 3.4, 0, 7); ctx.fill();
+          ctx.strokeStyle = '#191410'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(gx, gy, 3.4, 0, 7); ctx.stroke();
+        }
+      }
+
       /* signage */
       if (b.named) {
         if (b.name === 'Café Roma') drawMarquee(ctx, bx, by, bw, bh, dark);
@@ -337,6 +412,11 @@
       if (d.id === 'tigerback' && B.state && B.state.speakeasy.openForBusiness && dark > 0.3) {
         ctx.fillStyle = '#ff4433';
         ctx.beginPath(); ctx.arc(dx + ts / 2, dy + 1, 3, 0, 7); ctx.fill();
+        ctx.font = 'bold 9px Georgia'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffd76a';
+        ctx.fillText('XXX', dx + ts / 2, dy - 4);
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillText('XXX', dx + ts / 2, dy - 4);
       }
     }
 
@@ -396,6 +476,30 @@
         ctx.drawImage(p, 0, 0, p.width * 0.62, p.height * 0.62);
         ctx.restore();
       }
+      else if (d.type === 'barrel') {
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath(); ctx.ellipse(dx + 10, dy + 20, 10, 3.4, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#5e4426';
+        ctx.beginPath(); ctx.ellipse(dx + 10, dy + 10, 9, 10, 0, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#191410'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(dx + 10, dy + 10, 9, 10, 0, 0, 7); ctx.stroke();
+        ctx.fillStyle = '#7a5c34';
+        ctx.beginPath(); ctx.ellipse(dx + 10, dy + 4.5, 7.4, 3.4, 0, 0, 7); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(dx + 10, dy + 4.5, 7.4, 3.4, 0, 0, 7); ctx.stroke();
+        ctx.strokeStyle = 'rgba(30,25,18,0.7)'; ctx.lineWidth = 1.4;
+        for (const hy of [8, 14]) {
+          ctx.beginPath(); ctx.ellipse(dx + 10, dy + hy, 8.7, 3.2, 0, 0, Math.PI); ctx.stroke();
+        }
+      } else if (d.type === 'policeline') {
+        ctx.fillStyle = '#1c1a17';
+        ctx.fillRect(dx, dy + 2, 3, 20); ctx.fillRect(dx + 82, dy + 2, 3, 20);
+        ctx.fillStyle = '#d8b83a';
+        ctx.fillRect(dx + 2, dy + 7, 82, 8);
+        ctx.fillStyle = '#241f14';
+        ctx.font = 'bold 6px Georgia'; ctx.textAlign = 'center';
+        ctx.fillText('POLICE LINE — DO NOT CROSS', dx + 43, dy + 13);
+      }
       // vents render nothing static — their steam lives in renderAtmosphere
     }
   };
@@ -444,7 +548,8 @@
 
   B.renderAtmosphere = function (ctx, cam) {
     const dark = B.darkness();
-    const alpha = 0.028 + dark * 0.05;
+    const wx = B.state ? B.state.weather : 'clear';
+    const alpha = (0.028 + dark * 0.05) * (wx === 'fog' ? 2.6 : 1);
     ctx.save();
     for (const f of FOG) {
       const x = ((f.seed * 3 + B.frame * f.sp) % (B.VIEW_W + 700)) - 350;
@@ -469,6 +574,27 @@
         ctx.beginPath();
         ctx.arc(dx + Math.sin((B.frame + k * 50) * 0.03) * 6, dy - t, 5 + t * 0.14, 0, 7);
         ctx.fill();
+      }
+    }
+    // rain: fast diagonal streaks, plus splash rings on the pavement
+    if (wx === 'rain') {
+      ctx.strokeStyle = 'rgba(180,195,215,0.32)';
+      ctx.lineWidth = 1;
+      const n = B.TUNE.weather.rainDrops;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const px = ((i * 379 + B.frame * 11 * (1 + (i % 3) * 0.2)) % (B.VIEW_W + 200)) - 100;
+        const py = ((i * 233 + B.frame * 26 * (1 + (i % 5) * 0.1)) % (B.VIEW_H + 60)) - 30;
+        ctx.moveTo(px, py);
+        ctx.lineTo(px - 3, py + 11);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(200,210,225,0.12)';
+      for (let i = 0; i < 14; i++) {
+        const t = (B.frame * 2 + i * 47) % 60;
+        const px = (i * 431 + Math.floor((B.frame * 2 + i * 47) / 60) * 977) % B.VIEW_W;
+        const py = (i * 269 + Math.floor((B.frame * 2 + i * 47) / 60) * 613) % B.VIEW_H;
+        ctx.beginPath(); ctx.ellipse(px, py, t * 0.25 + 1, t * 0.1 + 0.5, 0, 0, 7); ctx.stroke();
       }
     }
     ctx.restore();

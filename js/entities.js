@@ -130,6 +130,42 @@
     });
   };
 
+  /* ---------- ambient traffic: civilian sedans working the grid ---------- */
+  B.spawnTraffic = function () {
+    const rng = B.mulberry32(777);
+    // rectangular loops around different blocks, clockwise on the road grid
+    const loops = [
+      [[7.5, 25.5], [55.5, 25.5], [55.5, 57.5], [7.5, 57.5]],
+      [[39.5, 41.5], [87.5, 41.5], [87.5, 73.5], [39.5, 73.5]],
+      [[23.5, 57.5], [71.5, 57.5], [71.5, 89.5], [23.5, 89.5]],
+      [[55.5, 25.5], [103.5, 25.5], [103.5, 73.5], [55.5, 73.5]],
+      [[7.5, 41.5], [39.5, 41.5], [39.5, 89.5], [7.5, 89.5]],
+    ];
+    for (let i = 0; i < B.TUNE.traffic.cars; i++) {
+      const loop = loops[i % loops.length];
+      const start = loop[Math.floor(rng() * loop.length)];
+      B.addNPC({
+        id: 'car' + i, name: 'Sedan', kind: 'car', r: 0.5,
+        speed: B.TUNE.traffic.speed * (0.85 + rng() * 0.3),
+        x: start[0], y: start[1],
+        waypoints: loop, wpIndex: Math.floor(rng() * loop.length),
+        carTex: i % 5,
+      });
+    }
+  };
+
+  /* a driver brakes for anything on the road ahead */
+  function roadBlocked(n) {
+    const ahead = { x: n.x + Math.cos(n.facing) * 1.9, y: n.y + Math.sin(n.facing) * 1.9 };
+    if (B.dist(ahead.x, ahead.y, B.player.x, B.player.y) < 1.4) return true;
+    if (!B.state.truck.stolen && B.dist(ahead.x, ahead.y, B.truck.x, B.truck.y) < 1.7) return true;
+    for (const o of B.npcs) {
+      if (o === n || o.hidden) continue;
+      if ((o.kind === 'car' || o.kind === 'patrolcar') && B.dist(ahead.x, ahead.y, o.x, o.y) < 1.7) return true;
+    }
+    return false;
+  }
+
   function followWaypoints(n, dt) {
     const wp = n.waypoints[n.wpIndex];
     const d = B.dist(n.x, n.y, wp[0], wp[1]);
@@ -199,7 +235,9 @@
       if (c.kind !== 'cop' && c.kind !== 'patrolcar') continue;
       if (c.hidden) continue;
       if (c.id === 'brady' && st.flags.bradyPaid) continue;    // Brady looks the other way
-      if (copSees(c, c.kind === 'patrolcar' ? B.TUNE.law.carSight : B.TUNE.law.copSight)) { watched = true; break; }
+      let sight = c.kind === 'patrolcar' ? B.TUNE.law.carSight : B.TUNE.law.copSight;
+      if (st.weather === 'rain' || st.weather === 'fog') sight *= B.TUNE.weather.rainSightFactor;
+      if (copSees(c, sight)) { watched = true; break; }
     }
     if (watched) {
       let rate = B.isNight() ? B.TUNE.law.suspicionRateNight : B.TUNE.law.suspicionRateDay;
@@ -299,6 +337,7 @@
       if (n.hidden) continue;
       if (n.kind === 'thug') continue;                  // handled in updateThugs
       if (B.pursuit && (n.kind === 'cop' || n.kind === 'patrolcar')) continue;  // chasing
+      if (n.kind === 'car' && roadBlocked(n)) continue;
       if (n.follow) {
         const d = B.dist(n.x, n.y, B.player.x, B.player.y);
         if (d > 1.6) tryMove(n, (B.player.x - n.x) / d, (B.player.y - n.y) / d, dt * 1.6);
@@ -332,8 +371,9 @@
       const [nx, ny] = toPx(n.x, n.y);
       if (nx < -60 || ny < -60 || nx > B.VIEW_W + 60 || ny > B.VIEW_H + 60) continue;
       if (n.kind === 'patrolcar') { B.drawSedan(ctx, nx, ny, n.facing); continue; }
+      if (n.kind === 'car') { B.drawSedan(ctx, nx, ny, n.facing, B.TEX.civcars[n.carTex]); continue; }
       B.drawSprite(ctx, n, nx, ny);
-      if (n.id && n.name && B.dist(n.x, n.y, B.player.x, B.player.y) < 6 && n.kind !== 'ped') {
+      if (n.id && n.name && B.dist(n.x, n.y, B.player.x, B.player.y) < 6 && n.kind !== 'ped' && n.kind !== 'car') {
         ctx.fillStyle = n.kind === 'thug' && n.hostile ? '#e88' : '#e8d9a0';
         ctx.font = '12px Georgia'; ctx.textAlign = 'center';
         ctx.fillText(n.name, nx, ny - 32);

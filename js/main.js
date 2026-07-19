@@ -17,6 +17,7 @@
     B.spawnNamedNPCs();
     B.spawnPolice();
     B.spawnPedestrians(16);
+    B.spawnTraffic();
     B.initMinimap();
 
     document.getElementById('btn-new').addEventListener('click', newGame);
@@ -69,7 +70,7 @@
     const consider = (d, maxD, cand) => { if (d < maxD && d < bestD) { best = cand; bestD = d; } };
 
     for (const n of B.npcs) {
-      if (n.hidden || n.kind === 'patrolcar') continue;
+      if (n.hidden || n.kind === 'patrolcar' || n.kind === 'car') continue;
       if (n.kind === 'thug' && n.hostile) continue;
       const d = B.dist(p.x, p.y, n.x, n.y);
       if (n.id) {
