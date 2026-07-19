@@ -148,6 +148,76 @@
       return c;
     };
 
+    /* the Blind Tiger's bar room — painted once, shown atop the management panel */
+    B.TEX.tigerInterior = (function () {
+      const w2 = 808, h2 = 190, c = cv(w2, h2), g = c.getContext('2d');
+      const rng = B.mulberry32(1929);
+      // red velvet wall with paneling
+      const grad = g.createLinearGradient(0, 0, 0, h2);
+      grad.addColorStop(0, '#3a1216'); grad.addColorStop(1, '#24090c');
+      g.fillStyle = grad; g.fillRect(0, 0, w2, h2);
+      g.strokeStyle = 'rgba(120,40,45,0.5)'; g.lineWidth = 2;
+      for (let x = 30; x < w2; x += 90) g.strokeRect(x, 14, 66, 74);
+      // back bar: shelves of bottles
+      g.fillStyle = '#2a1a10';
+      g.fillRect(180, 20, 450, 92);
+      g.strokeStyle = '#171008'; g.lineWidth = 3;
+      g.strokeRect(180, 20, 450, 92);
+      for (const sy of [50, 82]) {
+        g.fillStyle = '#3f2a16'; g.fillRect(186, sy, 438, 5);
+        for (let x = 196; x < 610; x += 18) {
+          const bh2 = 16 + rng() * 8;
+          g.fillStyle = ['#7c4a1e', '#3c5a34', '#7c2a26', '#c8a44a', '#3a4a6a'][Math.floor(rng() * 5)];
+          g.fillRect(x, sy - bh2, 8, bh2);
+          g.fillStyle = 'rgba(255,255,255,0.25)';
+          g.fillRect(x + 1.5, sy - bh2 + 2, 2, bh2 - 4);
+          g.fillStyle = '#241a10';
+          g.fillRect(x + 2, sy - bh2 - 3, 4, 4);
+        }
+      }
+      // neon sign over the bar
+      g.font = 'bold 26px Georgia'; g.textAlign = 'center';
+      g.fillStyle = 'rgba(255,80,120,0.35)';
+      for (let k = 6; k > 0; k--) g.fillText('THE BLIND TIGER', w2 / 2 + 3, 40, 400);
+      g.fillStyle = '#ff9ab8';
+      g.fillText('THE BLIND TIGER', w2 / 2 + 3, 40, 400);
+      g.fillStyle = 'rgba(255,255,255,0.85)';
+      g.font = 'bold 25px Georgia';
+      g.fillText('THE BLIND TIGER', w2 / 2 + 3, 39.5, 396);
+      // bar counter
+      const bg2 = g.createLinearGradient(0, 118, 0, 150);
+      bg2.addColorStop(0, '#5a3a1c'); bg2.addColorStop(1, '#341f0e');
+      g.fillStyle = bg2; g.fillRect(120, 118, 570, 34);
+      g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(120, 118, 570, 4);
+      g.fillStyle = '#241505'; g.fillRect(120, 150, 570, 8);
+      // stools
+      for (let x = 170; x < 660; x += 90) {
+        g.fillStyle = '#6a1f22';
+        g.beginPath(); g.ellipse(x, 168, 20, 7, 0, 0, 7); g.fill();
+        g.fillStyle = '#1c1208';
+        g.fillRect(x - 3, 172, 6, 16);
+      }
+      // hanging lamps with warm pools
+      for (const lx of [230, 404, 578]) {
+        g.strokeStyle = '#0f0a06'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(lx, 0); g.lineTo(lx, 12); g.stroke();
+        g.fillStyle = '#2a2014';
+        g.beginPath(); g.moveTo(lx - 12, 20); g.lineTo(lx + 12, 20); g.lineTo(lx + 6, 10); g.lineTo(lx - 6, 10);
+        g.closePath(); g.fill();
+        const lg = g.createRadialGradient(lx, 24, 2, lx, 24, 60);
+        lg.addColorStop(0, 'rgba(255,205,120,0.5)'); lg.addColorStop(1, 'rgba(255,205,120,0)');
+        g.fillStyle = lg;
+        g.beginPath(); g.arc(lx, 24, 60, 0, 7); g.fill();
+        g.fillStyle = '#ffe6a8';
+        g.beginPath(); g.arc(lx, 22, 3.4, 0, 7); g.fill();
+      }
+      // vignette
+      const vg = g.createRadialGradient(w2 / 2, h2 / 2, h2 / 2, w2 / 2, h2 / 2, w2 / 1.4);
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+      g.fillStyle = vg; g.fillRect(0, 0, w2, h2);
+      return c.toDataURL();
+    })();
+
     /* tattered street posters, in the reference's style */
     const posterSpecs = [
       { lines: ['PROHIBITION'], sub: 'IS THE LAW', tone: '#cfc0a2' },

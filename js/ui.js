@@ -53,12 +53,17 @@
   B.refreshHUD = function () {
     const s = B.state;
     $('st-cash').textContent = B.fmt$(s.cash);
-    $('st-day').textContent = 'Day ' + s.day + ' · ' + B.timeStr(s.minutes);
-    $('st-heat').textContent = 'HEAT ' + Math.round(s.heat);
-    $('st-heat').style.color = s.heat >= 50 ? '#ff8a8a' : s.heat >= 25 ? '#d9a883' : '#a8c9a3';
+    const wx = s.weather === 'rain' ? ' · RAIN' : s.weather === 'fog' ? ' · FOG' : '';
+    $('st-day').textContent = 'Day ' + s.day + ' · ' + B.timeStr(s.minutes) + wx;
+    // heat as wanted stars, like the reference HUD mockups
+    const stars = Math.min(5, Math.round(s.heat / 20));
+    $('st-heat').textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+    $('st-heat').title = 'Police attention: ' + Math.round(s.heat) + ' / 100';
+    $('st-heat').style.color = s.heat >= 50 ? '#ff7a5a' : '#e0b13a';
     $('st-rep').textContent = 'REP ' + s.rep;
     $('st-comm').textContent = 'COMMUNITY ' + s.community;
-    $('st-hp').textContent = 'HP ' + s.hp;
+    $('st-stock').querySelector('b').textContent = s.speakeasy.stock;
+    $('hp-fill').style.width = s.hp + '%';
     $('objective').textContent = B.currentObjective();
 
     const sw = $('suspicion-wrap');
@@ -263,6 +268,21 @@
     ctx.fillRect(B.truck.x * sx - 1.5, B.truck.y * sy - 1.5, 3, 3);
     ctx.fillStyle = '#ff5544';
     ctx.beginPath(); ctx.arc(B.player.x * sx, B.player.y * sy, 2.5, 0, 7); ctx.fill();
+    // compass rose, bottom-left corner
+    ctx.save();
+    ctx.translate(16, 128);
+    ctx.fillStyle = 'rgba(20,16,10,0.75)';
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#b58f2e'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#e0c46a';
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(2.6, 0); ctx.lineTo(-2.6, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8a7448';
+    ctx.beginPath(); ctx.moveTo(0, 9); ctx.lineTo(2.6, 0); ctx.lineTo(-2.6, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e0c46a';
+    ctx.font = 'bold 7px Georgia'; ctx.textAlign = 'center';
+    ctx.fillText('N', 0, -14);
+    ctx.restore();
   };
 
   /* where should the player be heading right now? (for the minimap ring) */

@@ -88,6 +88,20 @@ B.TUNE = {
     fedResetTo: 2,           // where the clock lands after a sweep
   },
 
+  weather: {
+    /* daily draw: clear / fog / rain — the reference sheets' three moods */
+    rainChance: 0.22,
+    fogChance: 0.18,
+    rainSightFactor: 0.75,   // cops see less through a downpour
+    rainPatronFactor: 0.85,  // a wet night thins the crowd
+    rainDrops: 260,          // particles on screen
+  },
+
+  traffic: {
+    cars: 5,                 // ambient 1920s sedans working the grid
+    speed: 5.2,
+  },
+
   rumors: {
     streetAccuracy: 0.6,     // tier-1 word of mouth is right 3 times in 5
     mickeyPrice: 5,          // tier-3: paid, specific, reliable

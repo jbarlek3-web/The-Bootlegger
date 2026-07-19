@@ -309,6 +309,11 @@
     const s = st();
     s.day++;
     tickClocks(s);           // the Bureau reacts to yesterday's heat, before it cools
+    // roll the day's weather
+    const wr = Math.random(), Wt = B.TUNE.weather;
+    s.weather = wr < Wt.rainChance ? 'rain' : wr < Wt.rainChance + Wt.fogChance ? 'fog' : 'clear';
+    if (s.weather === 'rain') B.toast('Rain moves in off the harbor. Wet streets, short tempers, shorter sightlines.');
+    if (s.weather === 'fog') B.toast('Harbor fog rolls up the avenues. A good day to be hard to see.');
     // heat cools with time; friends make it cool faster
     let decay = B.TUNE.heat.dailyDecay;
     if (s.flags.bradyPaid) decay += B.TUNE.heat.bradyBonusDecay;

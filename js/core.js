@@ -79,6 +79,7 @@ B.newState = function () {
     stats: { runs: 0, cratesMoved: 0, nightsOpen: 0, timesBusted: 0 },
     confessedDay: 0,
     payoffDay: 0,
+    weather: 'clear',               // clear | fog | rain — rolled each dawn
   };
 };
 

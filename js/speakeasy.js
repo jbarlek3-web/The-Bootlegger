@@ -18,6 +18,7 @@
     let n = base * priceFactor;
     n -= st.heat * t.heatScare;
     if (st.flags.picketTonight) n *= 0.5;
+    if (st.weather === 'rain') n *= B.TUNE.weather.rainPatronFactor;
     return Math.max(0, Math.round(n));
   };
 
@@ -139,6 +140,7 @@
        <td>${hired ? '<span class="good">on the payroll</span>' : '<button data-act="hire-' + key + '">Hire</button>'}</td></tr>`;
 
     B.openPanel('The Blind Tiger', `
+      <img src="${B.TEX.tigerInterior}" alt="" style="width:100%;border:1px solid #6b5a33;border-radius:2px;margin-bottom:10px;display:block">
       <img src="assets/sprites/jug.png" alt="" style="height:64px;float:right;margin:-6px 0 6px 12px;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.6))">
       <p class="dim">Behind the Café Roma. Password at the door is <i>"swordfish."</i></p>
       <h3>Cellar &amp; Bar</h3>

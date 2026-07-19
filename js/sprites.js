@@ -322,21 +322,23 @@
     makeSedan();
   };
 
-  /* the prowl car — a black-and-navy sedan */
-  function makeSedan() {
+  /* period sedans — the prowl car plus civilian traffic in 1920s colors */
+  function makeAuto(body, roof, label) {
     const L = 46, Wd = 24;
     const c = cv(L * SCALE, Wd * SCALE), g = c.getContext('2d');
     g.scale(SCALE, SCALE);
     g.lineJoin = 'round'; g.lineWidth = 1.4; g.strokeStyle = OUT;
-    g.fillStyle = '#1d2438';
+    g.fillStyle = body;
     g.beginPath(); g.roundRect(2, 3, L - 6, Wd - 6, 4); g.fill(); g.stroke();
-    g.fillStyle = '#12161f';                              // cabin roof
+    g.fillStyle = roof;                                   // cabin roof
     g.beginPath(); g.roundRect(12, 5.5, 18, Wd - 11, 3); g.fill(); g.stroke();
     g.fillStyle = 'rgba(255,255,255,0.16)';
     g.beginPath(); g.roundRect(14, 7, 5, Wd - 14, 2); g.fill();
-    g.fillStyle = '#e8e2d2';
-    g.font = 'bold 5px Georgia'; g.textAlign = 'center';
-    g.save(); g.translate(21, Wd / 2); g.rotate(0); g.fillText('POLICE', 0, 1.8); g.restore();
+    if (label) {
+      g.fillStyle = '#e8e2d2';
+      g.font = 'bold 5px Georgia'; g.textAlign = 'center';
+      g.fillText(label, 21, Wd / 2 + 1.8);
+    }
     g.fillStyle = '#5c6470';                              // radiator
     g.fillRect(L - 5, 7, 2, Wd - 14);
     g.fillStyle = '#ffe9a8';
@@ -347,18 +349,25 @@
       g.beginPath(); g.roundRect(x - 4, -0.2, 8.5, 3.6, 1.8); g.fill();
       g.beginPath(); g.roundRect(x - 4, Wd - 3.4, 8.5, 3.6, 1.8); g.fill();
     });
-    B.TEX.police = c;
-    B.TEX.policeSize = [L, Wd];
+    return c;
   }
 
-  B.drawSedan = function (ctx, px, py, facing) {
+  function makeSedan() {
+    B.TEX.police = makeAuto('#1d2438', '#12161f', 'POLICE');
+    B.TEX.policeSize = [46, 24];
+    // the reference sheet's traffic: black, hunter green, oxblood, navy, tan
+    B.TEX.civcars = ['#191a1c', '#2c4030', '#4e2426', '#26304a', '#5a4c34']
+      .map(cc => makeAuto(cc, B.shade(cc, -0.35), null));
+  }
+
+  B.drawSedan = function (ctx, px, py, facing, tex) {
     const [L, Wd] = B.TEX.policeSize;
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(facing);
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(0, 2, L / 2, Wd / 2, 0, 0, 7); ctx.fill();
-    ctx.drawImage(B.TEX.police, -L / 2, -Wd / 2, L, Wd);
+    ctx.drawImage(tex || B.TEX.police, -L / 2, -Wd / 2, L, Wd);
     if (B.darkness() > 0.15) {
       ctx.fillStyle = 'rgba(255,230,160,0.14)';
       ctx.beginPath();

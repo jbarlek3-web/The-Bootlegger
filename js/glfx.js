@@ -270,11 +270,15 @@
         const [ax, ay] = px(52.0, 63.5);
         if (onScreen(ax, ay, 150)) out.push({ x: ax, y: ay, r: 130, i: 1.2, c: [1.0, 0.32, 0.22] });
       }
+      // the Ambassador's HOTEL neon
+      const [hx, hy] = px(67.2, 34.2);
+      if (onScreen(hx, hy, 160)) out.push({ x: hx, y: hy, r: 120, i: 0.8, c: [1.0, 0.35, 0.28] });
       // headlamps: player truck + prowl car
       const heads = [];
       if (B.player.inTruck || B.dist(B.truck.x, B.truck.y, B.player.x, B.player.y) < 30) heads.push(B.truck);
       const prowl = B.npcById && B.npcById('prowl');
       if (prowl && !prowl.hidden) heads.push(prowl);
+      for (const c of B.npcs) if (c.kind === 'car' && !c.hidden) heads.push(c);
       for (const v of heads) {
         const hx = v.x + Math.cos(v.facing) * 2.4, hy = v.y + Math.sin(v.facing) * 2.4;
         const [x, y] = px(hx, hy);
