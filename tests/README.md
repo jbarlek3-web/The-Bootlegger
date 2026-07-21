@@ -7,13 +7,15 @@ Headless-browser tests that drive the real game end-to-end with Playwright:
 - `smoke2.js` — missions 4–8 (all resolution paths that can be scripted:
   persuasion, bribery, leverage, reputation), the Route 9 checkpoint encounter,
   a side quest, and thug combat
+- `mobile.js` — phone-viewport playability: stage scaling, virtual joystick,
+  touch buttons, tap-driven dialogue/panels, portrait rescale
 
 ## Run
 
 ```
 npm i -g playwright http-server        # once; also: npx playwright install chromium
 http-server -p 8321 -s &               # serve the repo root
-node tests/smoke.js && node tests/smoke2.js
+node tests/smoke.js && node tests/smoke2.js && node tests/mobile.js
 ```
 
 Environment overrides:

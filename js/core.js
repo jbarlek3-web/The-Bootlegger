@@ -129,6 +129,7 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { B.keys[e.key.toLowerCase()] = false; });
 
 B.axis = function () {
+  if (B.touchAxis) return B.touchAxis;      // virtual joystick wins while held
   let dx = 0, dy = 0;
   if (B.keys['w'] || B.keys['arrowup']) dy -= 1;
   if (B.keys['s'] || B.keys['arrowdown']) dy += 1;

@@ -28,6 +28,7 @@
     });
 
     B.initGlfx(canvas);
+    B.initTouch();
 
     requestAnimationFrame(loop);
   }

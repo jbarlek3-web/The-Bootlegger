@@ -36,6 +36,12 @@ python3 -m http.server 8000
 | 1–9 | Choose dialogue options |
 | F2 | Debug / telemetry overlay |
 
+**On phones and tablets** the game scales to the screen and shows touch controls:
+a virtual joystick (lower left — press anywhere and drag), USE and HIT buttons
+(lower right), and JRNL / MAP / +1H / MENU buttons under the minimap. Dialogue
+options and panels are tapped; story cards dismiss on tap. Landscape recommended.
+Append `?touch=1` to the URL to force the touch controls on any device.
+
 ## The Game
 
 ### The story

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>The Bootlegger — 1920</title>
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
@@ -61,7 +61,22 @@
     <p class="fine">A work of historical fiction. WASD to move · E to interact · H for help</p>
   </div>
 
-  <div id="flash-overlay" class="hidden"><div id="flash-text"></div><p class="fine">Press Enter</p></div>
+  <div id="flash-overlay" class="hidden"><div id="flash-text"></div><p class="fine">Press Enter or tap</p></div>
+
+  <!-- touch controls (shown on touch devices, or with ?touch=1) -->
+  <div id="touch-ui" class="hidden">
+    <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+    <div id="touch-actions">
+      <button id="tb-punch" class="tbtn">HIT</button>
+      <button id="tb-act" class="tbtn big">USE</button>
+    </div>
+    <div id="touch-menu">
+      <button class="tbtn small" data-k="j">JRNL</button>
+      <button class="tbtn small" data-k="m">MAP</button>
+      <button class="tbtn small" data-k="t">+1H</button>
+      <button class="tbtn small" data-k="Escape">MENU</button>
+    </div>
+  </div>
 </div>
 <script src="js/core.js"></script>
 <script src="js/tuning.js"></script>
@@ -75,6 +90,7 @@
 <script src="js/missions.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/save.js"></script>
+<script src="js/touch.js"></script>
 <script src="js/glfx.js"></script>
 <script src="js/main.js"></script>
 </body>
